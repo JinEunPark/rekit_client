@@ -1,85 +1,129 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import RekitLogo from '@/components/ds/RekitLogo.vue'
+import IconBase from '@/components/ds/IconBase.vue'
+import AppHeader from '@/components/layout/AppHeader.vue'
+import AppFooter from '@/components/layout/AppFooter.vue'
+import MobileTabBar from '@/components/layout/MobileTabBar.vue'
+
+const route = useRoute()
+
+const isDesignFrame = computed(() => route.path.startsWith('/_design/'))
+const isDesignIndex = computed(() => route.path === '/_design')
+const isAuth = computed(() => route.path.startsWith('/auth'))
+
+const stage = computed(() => {
+  if (route.path.startsWith('/_design/buyer')) return 'phone'
+  if (route.path.startsWith('/_design/admin') || route.path.startsWith('/_design/desktop')) return 'desktop'
+  return 'page'
+})
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
+  <!-- Design canvas frames (one screen per route) -->
+  <div v-if="isDesignFrame" class="canvas" :class="`canvas--${stage}`">
+    <header class="canvas__header">
+      <RouterLink to="/_design" class="canvas__back">
+        <IconBase name="arrowLeft" :size="16" />
+        <span>모든 화면</span>
+      </RouterLink>
+      <RekitLogo :size="20" />
+      <span class="canvas__path">DESIGN REFERENCE · {{ route.path }}</span>
+    </header>
+    <div class="canvas__stage">
+      <RouterView />
     </div>
-  </header>
+  </div>
 
-  <RouterView />
+  <!-- Design index (own layout) -->
+  <RouterView v-else-if="isDesignIndex" />
+
+  <!-- Auth (blank layout, focused) -->
+  <RouterView v-else-if="isAuth" />
+
+  <!-- Real app -->
+  <div v-else class="app">
+    <AppHeader />
+    <main class="app__main">
+      <RouterView />
+    </main>
+    <AppFooter />
+    <MobileTabBar />
+  </div>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--rekit-bg);
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.app__main {
+  flex: 1;
+  /* Reserve space for the fixed mobile tab bar (only matters on mobile). */
+  padding-bottom: 80px;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+@media (min-width: 768px) {
+  .app__main {
+    padding-bottom: 0;
   }
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
+/* Design canvas frame */
+.canvas {
+  min-height: 100vh;
+  background: var(--rekit-surface-muted);
+  display: flex;
+  flex-direction: column;
+}
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+.canvas__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--rekit-surface);
+  border-bottom: 1px solid var(--rekit-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
+.canvas__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--rekit-border);
+}
 
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+.canvas__path {
+  margin-left: auto;
+  font-family: var(--rekit-font-mono);
+  font-size: 11px;
+  color: var(--rekit-ink-subtle);
+}
+
+.canvas__stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow: auto;
+}
+
+.canvas--desktop .canvas__stage {
+  padding: 24px;
+  align-items: flex-start;
 }
 </style>
