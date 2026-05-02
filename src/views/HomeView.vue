@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { won } from '@/design/tokens'
-import { PRODUCTS, discountPct, type ApplianceKind } from '@/data/products'
+import { PRODUCTS, type ApplianceKind } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import ApplianceGlyph from '@/components/ds/ApplianceGlyph.vue'
-import ProductTile from '@/components/ds/ProductTile.vue'
-import Badge from '@/components/ds/Badge.vue'
+import ProductCard from '@/components/products/ProductCard.vue'
 import type { IconName } from '@/design/icons'
 
 type PromiseCard = {
@@ -96,35 +94,7 @@ const featured = PRODUCTS.slice(0, 8)
         </RouterLink>
       </div>
       <div class="feat__grid">
-        <RouterLink
-          v-for="p in featured"
-          :key="p.id"
-          :to="`/products/${p.id}`"
-          class="card"
-        >
-          <div class="card__media">
-            <ProductTile :kind="p.kind" :tone="p.tone" :grade="p.grade" ratio="1/1" />
-            <button class="card__heart" aria-label="관심상품 추가" @click.prevent>
-              <IconBase name="heart" :size="15" />
-            </button>
-            <div v-if="p.tag" class="card__tag">{{ p.tag }}</div>
-          </div>
-          <div class="card__body">
-            <div class="card__brand">{{ p.brand }} · {{ p.year }}</div>
-            <div class="card__title">{{ p.title }}</div>
-            <div class="card__price">
-              <span class="card__pct">{{ discountPct(p) }}%</span>
-              <span class="card__won">{{ won(p.price) }}</span>
-            </div>
-            <div class="card__orig">{{ won(p.original) }}</div>
-            <div v-if="p.warranty" class="card__warranty">
-              <Badge tone="accent" size="xs">
-                <IconBase name="check" :size="10" :stroke="2.4" />
-                동작보증
-              </Badge>
-            </div>
-          </div>
-        </RouterLink>
+        <ProductCard v-for="p in featured" :key="p.id" :product="p" />
       </div>
     </section>
 
@@ -456,113 +426,6 @@ const featured = PRODUCTS.slice(0, 8)
   }
   .feat__title {
     font-size: 28px;
-  }
-}
-
-/* product card */
-.card {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-}
-
-.card__media {
-  position: relative;
-}
-
-.card__heart {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--rekit-ink-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card__heart:hover {
-  color: var(--rekit-danger);
-}
-
-.card__tag {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--rekit-ink);
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 700;
-}
-
-.card__body {
-  padding: 10px 2px 0;
-}
-
-.card__brand {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--rekit-ink-subtle);
-}
-
-.card__title {
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 2px;
-  line-height: 1.35;
-  letter-spacing: -0.015em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card__price {
-  margin-top: 6px;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.card__pct {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--rekit-danger);
-}
-
-.card__won {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.card__orig {
-  font-size: 11px;
-  color: var(--rekit-ink-subtle);
-  text-decoration: line-through;
-  margin-top: 1px;
-}
-
-.card__warranty {
-  margin-top: 8px;
-}
-
-@media (min-width: 768px) {
-  .card__title {
-    font-size: 14px;
-  }
-  .card__pct,
-  .card__won {
-    font-size: 14px;
-  }
-  .card__won {
-    font-size: 17px;
   }
 }
 

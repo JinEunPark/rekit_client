@@ -14,6 +14,9 @@ const router = createRouter({
     // My page — handles unauthenticated state inline
     { path: '/my', name: 'my', component: () => import('../views/my/MyView.vue') },
 
+    // Products
+    { path: '/products', name: 'products', component: () => import('../views/products/ListView.vue') },
+
     // Static / marketing pages
     { path: '/guide', name: 'guide', component: () => import('../views/static/GuideView.vue') },
     { path: '/about', name: 'about', component: () => import('../views/static/AboutView.vue') },
