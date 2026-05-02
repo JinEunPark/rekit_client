@@ -4,17 +4,22 @@ import { RouterLink } from 'vue-router'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
+import SearchDropdown from '@/components/search/SearchDropdown.vue'
+import type { IconName } from '@/design/icons'
 
 const auth = useAuthStore()
+const cart = useCartStore()
 
-const navItems = [
-  { to: '/', label: '홈' },
-  { to: '/products?cat=fridge', label: '냉장고' },
-  { to: '/products?cat=washer', label: '세탁기' },
-  { to: '/products?cat=tv', label: 'TV' },
-  { to: '/products?cat=aircon', label: '에어컨' },
-  { to: '/products?cat=kitchen', label: '주방가전' },
-  { to: '/products?tag=event', label: '기획전' },
+// Drawer is auxiliary navigation — primary category browsing happens via the
+// home Categories grid, the /products page, and (mobile) the bottom tab bar.
+// So drawer focuses on account + help links instead of duplicating categories.
+const helpLinks: { to: string; icon: IconName; label: string }[] = [
+  { to: '/products', icon: 'grid', label: '전체 상품 둘러보기' },
+  { to: '/guide', icon: 'info', label: '이용 안내' },
+  { to: '/help/faq', icon: 'shield', label: '자주 묻는 질문' },
+  { to: '/help/contact', icon: 'mail', label: '문의하기' },
+  { to: '/help/notice', icon: 'bell', label: '공지사항' },
 ]
 
 const drawerOpen = ref(false)
@@ -32,24 +37,8 @@ const drawerOpen = ref(false)
         <RekitLogo :size="22" />
       </RouterLink>
 
-      <!-- Desktop: inline nav -->
-      <nav class="hd__nav">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.label"
-          :to="item.to"
-          class="hd__nav-item"
-          active-class="hd__nav-item--active"
-        >
-          {{ item.label }}
-        </RouterLink>
-      </nav>
-
-      <!-- Desktop: search bar -->
-      <RouterLink to="/search" class="hd__search">
-        <IconBase name="search" :size="16" />
-        <span>모델명, 브랜드 검색</span>
-      </RouterLink>
+      <!-- Desktop: search dropdown (anchored panel). Mobile uses search icon link to /search. -->
+      <SearchDropdown class="hd__search" />
 
       <div class="hd__actions">
         <RouterLink to="/search" class="hd__icon hd__icon--mobile-only" aria-label="검색">
@@ -60,6 +49,7 @@ const drawerOpen = ref(false)
         </RouterLink>
         <RouterLink to="/cart" class="hd__icon" aria-label="장바구니">
           <IconBase name="cart" :size="20" />
+          <span v-if="cart.count > 0" class="hd__icon-badge">{{ cart.count > 99 ? '99+' : cart.count }}</span>
         </RouterLink>
         <RouterLink to="/my" class="hd__icon hd__icon--desktop-only" aria-label="마이페이지">
           <IconBase name="user" :size="20" />
@@ -101,14 +91,15 @@ const drawerOpen = ref(false)
           </RouterLink>
           <nav class="hd__drawer-nav">
             <RouterLink
-              v-for="item in navItems"
-              :key="item.label"
+              v-for="item in helpLinks"
+              :key="item.to"
               :to="item.to"
               class="hd__drawer-link"
               @click="drawerOpen = false"
             >
-              {{ item.label }}
-              <IconBase name="chevronRight" :size="14" />
+              <IconBase :name="item.icon" :size="18" class="hd__drawer-link-icon" />
+              <span>{{ item.label }}</span>
+              <IconBase name="chevronRight" :size="14" class="hd__drawer-link-chev" />
             </RouterLink>
           </nav>
         </aside>
@@ -152,44 +143,12 @@ const drawerOpen = ref(false)
   flex-shrink: 0;
 }
 
-.hd__nav {
-  display: none;
-  gap: 22px;
-  margin-left: 12px;
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.hd__nav-item {
-  color: var(--rekit-ink-muted);
-  text-decoration: none;
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-}
-
-.hd__nav-item--active,
-.hd__nav-item:hover {
-  color: var(--rekit-ink);
-}
-
+/* Wrapper for the desktop SearchDropdown — sizing only; visual styling lives in the component. */
 .hd__search {
   display: none;
-  align-items: center;
-  gap: 8px;
   flex: 1;
-  max-width: 460px;
-  margin-left: auto;
-  padding: 10px 14px;
-  background: var(--rekit-bg);
-  border: 1px solid var(--rekit-border);
-  border-radius: 12px;
-  text-decoration: none;
-  color: var(--rekit-ink-placeholder);
-  font-size: 13px;
-}
-
-.hd__search:hover {
-  border-color: var(--rekit-border-strong);
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .hd__actions {
@@ -200,6 +159,7 @@ const drawerOpen = ref(false)
 }
 
 .hd__icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,6 +168,23 @@ const drawerOpen = ref(false)
   border-radius: 8px;
   color: var(--rekit-ink-muted);
   text-decoration: none;
+}
+
+.hd__icon-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rekit-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  letter-spacing: -0.02em;
 }
 
 .hd__icon:hover {
@@ -228,15 +205,8 @@ const drawerOpen = ref(false)
   .hd__icon--mobile-only {
     display: none;
   }
-  .hd__nav {
-    display: flex;
-  }
   .hd__search {
-    display: flex;
-    margin-left: 0;
-  }
-  .hd__actions {
-    margin-left: 0;
+    display: block;
   }
   .hd__icon--desktop-only {
     display: flex;
@@ -324,7 +294,7 @@ const drawerOpen = ref(false)
 .hd__drawer-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 14px 20px;
   color: var(--rekit-ink);
   text-decoration: none;
@@ -334,7 +304,13 @@ const drawerOpen = ref(false)
 .hd__drawer-link:hover {
   background: var(--rekit-surface-muted);
 }
-.hd__drawer-link svg {
+.hd__drawer-link span {
+  flex: 1;
+}
+.hd__drawer-link-icon {
+  color: var(--rekit-ink-muted);
+}
+.hd__drawer-link-chev {
   color: var(--rekit-ink-subtle);
 }
 

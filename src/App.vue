@@ -12,6 +12,8 @@ const route = useRoute()
 const isDesignFrame = computed(() => route.path.startsWith('/_design/'))
 const isDesignIndex = computed(() => route.path === '/_design')
 const isAuth = computed(() => route.path.startsWith('/auth'))
+const isCheckout = computed(() => route.path.startsWith('/checkout'))
+const isSearch = computed(() => route.path === '/search')
 
 const stage = computed(() => {
   if (route.path.startsWith('/_design/buyer')) return 'phone'
@@ -42,14 +44,17 @@ const stage = computed(() => {
   <!-- Auth (blank layout, focused) -->
   <RouterView v-else-if="isAuth" />
 
+  <!-- Search (blank layout, focused — has own back + search bar) -->
+  <RouterView v-else-if="isSearch" />
+
   <!-- Real app -->
-  <div v-else class="app">
+  <div v-else class="app" :class="{ 'app--focused': isCheckout }">
     <AppHeader />
     <main class="app__main">
       <RouterView />
     </main>
-    <AppFooter />
-    <MobileTabBar />
+    <AppFooter v-if="!isCheckout" />
+    <MobileTabBar v-if="!isCheckout" />
   </div>
 </template>
 
@@ -65,6 +70,11 @@ const stage = computed(() => {
   flex: 1;
   /* Reserve space for the fixed mobile tab bar (only matters on mobile). */
   padding-bottom: 80px;
+}
+
+/* Focused mode (checkout) hides tab bar — no extra bottom padding needed. */
+.app--focused .app__main {
+  padding-bottom: 0;
 }
 
 @media (min-width: 768px) {

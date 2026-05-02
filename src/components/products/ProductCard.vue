@@ -1,12 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { won } from '@/design/tokens'
 import { discountPct, type Product } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
+import { useWishlistStore } from '@/stores/wishlist'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     product: Product
     /** Show original price strikethrough below the discounted price. */
@@ -14,6 +16,13 @@ withDefaults(
   }>(),
   { showOriginal: true },
 )
+
+const wishlist = useWishlistStore()
+const liked = computed(() => wishlist.has(props.product.id))
+
+function toggleLike() {
+  wishlist.toggle(props.product.id)
+}
 </script>
 
 <template>
@@ -25,7 +34,14 @@ withDefaults(
         :grade="product.grade"
         ratio="1/1"
       />
-      <button class="card__heart" aria-label="관심상품 추가" @click.prevent>
+      <button
+        type="button"
+        class="card__heart"
+        :class="{ 'card__heart--on': liked }"
+        :aria-label="liked ? '관심상품 해제' : '관심상품 추가'"
+        :aria-pressed="liked"
+        @click.stop.prevent="toggleLike"
+      >
         <IconBase name="heart" :size="15" />
       </button>
       <div v-if="product.tag" class="card__tag">{{ product.tag }}</div>
@@ -72,8 +88,13 @@ withDefaults(
   align-items: center;
   justify-content: center;
 }
-.card__heart:hover {
+.card__heart:hover,
+.card__heart--on {
   color: var(--rekit-danger);
+}
+.card__heart--on svg {
+  fill: var(--rekit-danger);
+  stroke: var(--rekit-danger);
 }
 
 .card__tag {

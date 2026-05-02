@@ -10,12 +10,31 @@ const router = createRouter({
     // Auth
     { path: '/auth/sign-in', name: 'sign-in', component: () => import('../views/auth/SignInView.vue') },
     { path: '/auth/sign-up', name: 'sign-up', component: () => import('../views/auth/SignUpView.vue') },
+    { path: '/auth/find-id', name: 'find-id', component: () => import('../views/auth/FindIdView.vue') },
+    { path: '/auth/find-password', name: 'find-password', component: () => import('../views/auth/FindPasswordView.vue') },
 
     // My page — handles unauthenticated state inline
     { path: '/my', name: 'my', component: () => import('../views/my/MyView.vue') },
+    { path: '/my/orders', name: 'my-orders', component: () => import('../views/my/OrdersView.vue') },
+    { path: '/my/orders/:id', name: 'my-order-detail', component: () => import('../views/my/OrderDetailView.vue') },
+    { path: '/my/wishlist', name: 'my-wishlist', component: () => import('../views/my/WishlistView.vue') },
+    { path: '/my/addresses', name: 'my-addresses', component: () => import('../views/my/AddressesView.vue') },
+    { path: '/my/profile', name: 'my-profile', component: () => import('../views/my/ProfileView.vue') },
 
     // Products
     { path: '/products', name: 'products', component: () => import('../views/products/ListView.vue') },
+    { path: '/products/:id', name: 'product-detail', component: () => import('../views/products/DetailView.vue') },
+
+    // Search
+    { path: '/search', name: 'search', component: () => import('../views/SearchView.vue') },
+
+    // Cart
+    { path: '/cart', name: 'cart', component: () => import('../views/cart/CartView.vue') },
+
+    // Checkout
+    { path: '/checkout/identity', name: 'checkout-identity', component: () => import('../views/checkout/IdentityView.vue') },
+    { path: '/checkout/order', name: 'checkout-order', component: () => import('../views/checkout/OrderView.vue') },
+    { path: '/checkout/complete', name: 'checkout-complete', component: () => import('../views/checkout/CompleteView.vue') },
 
     // Static / marketing pages
     { path: '/guide', name: 'guide', component: () => import('../views/static/GuideView.vue') },
