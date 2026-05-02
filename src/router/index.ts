@@ -14,6 +14,19 @@ const router = createRouter({
     // My page — handles unauthenticated state inline
     { path: '/my', name: 'my', component: () => import('../views/my/MyView.vue') },
 
+    // Static / marketing pages
+    { path: '/guide', name: 'guide', component: () => import('../views/static/GuideView.vue') },
+    { path: '/about', name: 'about', component: () => import('../views/static/AboutView.vue') },
+
+    // Help
+    { path: '/help/faq', name: 'help-faq', component: () => import('../views/help/FaqView.vue') },
+    { path: '/help/contact', name: 'help-contact', component: () => import('../views/help/ContactView.vue') },
+    { path: '/help/notice', name: 'help-notice', component: () => import('../views/help/NoticeView.vue') },
+
+    // Legal
+    { path: '/legal/terms', name: 'legal-terms', component: () => import('../views/legal/TermsView.vue') },
+    { path: '/legal/privacy', name: 'legal-privacy', component: () => import('../views/legal/PrivacyView.vue') },
+
     // ========== DESIGN REFERENCE ==========
     // Faithful Vue ports of the original design canvas screens.
     // Source code lives under src/_design/. Do not import from there in real app code.
@@ -41,6 +54,9 @@ const router = createRouter({
     // Desktop overview (mockup)
     { path: '/_design/desktop/home', component: () => import('../_design/desktop/HomeView.vue') },
     { path: '/_design/desktop/detail', component: () => import('../_design/desktop/DetailView.vue') },
+
+    // 404 catch-all (must be last)
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },
   ],
 })
 
