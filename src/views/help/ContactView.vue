@@ -10,7 +10,8 @@ const email = ref('')
 const message = ref('')
 const submitted = ref(false)
 
-function submit(e: Event) {
+function submit(e: Event)
+{
   e.preventDefault()
   if (!email.value || !message.value) return
   submitted.value = true
@@ -18,11 +19,7 @@ function submit(e: Event) {
 </script>
 
 <template>
-  <StaticPage
-    kicker="CONTACT"
-    title="문의하기"
-    lead="평일 10:00~18:00 사이에 영업일 기준 1~2일 내 회신드려요."
-  >
+  <StaticPage kicker="CONTACT" title="문의하기!" lead="평일 10:00~18:00 사이에 영업일 기준 1~2일 내 회신드려요.">
     <div v-if="submitted" class="ok">
       <div class="ok__icon">
         <IconBase name="check" :size="28" :stroke="2.5" />
@@ -48,12 +45,7 @@ function submit(e: Event) {
 
       <label class="field">
         <span class="field__label">문의 내용</span>
-        <textarea
-          v-model="message"
-          rows="6"
-          placeholder="자세한 상황을 적어주시면 더 빠르게 도와드릴 수 있어요."
-          required
-        />
+        <textarea v-model="message" rows="6" placeholder="자세한 상황을 적어주시면 더 빠르게 도와드릴 수 있어요." required />
       </label>
 
       <Button type="submit" variant="accent" size="lg" full>문의 보내기</Button>
@@ -76,16 +68,19 @@ function submit(e: Event) {
   flex-direction: column;
   gap: 14px;
 }
+
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
 .field__label {
   font-size: 12px;
   font-weight: 600;
   color: var(--rekit-ink-muted);
 }
+
 .field input,
 .field select,
 .field textarea {
@@ -101,17 +96,20 @@ function submit(e: Event) {
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
+
 .field textarea {
   resize: vertical;
   min-height: 140px;
   line-height: 1.55;
 }
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
   border-color: var(--rekit-ink);
   box-shadow: 0 0 0 3px rgba(26, 26, 23, 0.06);
 }
+
 .field input::placeholder,
 .field textarea::placeholder {
   color: var(--rekit-ink-placeholder);
@@ -121,6 +119,7 @@ function submit(e: Event) {
   text-align: center;
   padding: 32px 16px;
 }
+
 .ok__icon {
   width: 72px;
   height: 72px;
@@ -131,12 +130,14 @@ function submit(e: Event) {
   align-items: center;
   justify-content: center;
 }
+
 .ok__t {
   margin: 20px 0 0;
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.025em;
 }
+
 .ok__b {
   margin: 8px 0 0;
   font-size: 14px;
@@ -149,10 +150,12 @@ function submit(e: Event) {
   background: var(--rekit-surface-muted);
   border-radius: 14px;
 }
+
 .alt :deep(h2) {
   margin: 0 0 8px;
   font-size: 14px;
 }
+
 .alt :deep(li) {
   font-size: 13.5px;
   color: var(--rekit-ink-muted);
