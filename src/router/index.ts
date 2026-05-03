@@ -49,6 +49,14 @@ const router = createRouter({
     { path: '/legal/terms', name: 'legal-terms', component: () => import('../views/legal/TermsView.vue') },
     { path: '/legal/privacy', name: 'legal-privacy', component: () => import('../views/legal/PrivacyView.vue') },
 
+    // Admin console
+    { path: '/admin', name: 'admin-dashboard', component: () => import('../views/admin/DashboardView.vue') },
+    { path: '/admin/products', name: 'admin-products', component: () => import('../views/admin/ProductsView.vue') },
+    { path: '/admin/products/new', name: 'admin-product-new', component: () => import('../views/admin/ProductNewView.vue') },
+    { path: '/admin/orders', name: 'admin-orders', component: () => import('../views/admin/OrdersView.vue') },
+    { path: '/admin/members', name: 'admin-members', component: () => import('../views/admin/MembersView.vue') },
+    { path: '/admin/sales', name: 'admin-sales', component: () => import('../views/admin/SalesView.vue') },
+
     // ========== DESIGN REFERENCE ==========
     // Faithful Vue ports of the original design canvas screens.
     // Source code lives under src/_design/. Do not import from there in real app code.

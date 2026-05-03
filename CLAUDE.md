@@ -69,6 +69,7 @@ Routes branch into different layouts based on path prefix. Adding a focused page
 | **Auth focused** | `/auth/*` | Bare RouterView (no header/footer/tabbar) |
 | **Search focused** | exactly `/search` | Bare RouterView (its own back+search bar) |
 | **Checkout focused** | `/checkout/*` | Header only (no footer/tabbar) |
+| **Admin shell** | `/admin/*` | Bare RouterView — `AdminShell` (sidebar+header) renders inside each admin view |
 | Default | everything else | Header + main + Footer + MobileTabBar |
 
 ### Header pattern (responsive search)
@@ -94,11 +95,12 @@ The heart `<button>` uses `@click.stop.prevent` to avoid triggering navigation. 
 - **Checkout (3)**: `/checkout/identity` → `/checkout/order` → `/checkout/complete?order=…`
 - **My (6)**: `/my`, `/my/orders`, `/my/orders/:id`, `/my/wishlist`, `/my/addresses`, `/my/profile`
 - **Static (7)**: `/guide`, `/about`, `/help/{faq,contact,notice}`, `/legal/{terms,privacy}`, 404
+- **Admin (6)**: `/admin`, `/admin/{products,products/new,orders,members,sales}` — responsive port via `components/admin/AdminShell.vue` (sidebar collapses to drawer <1024px). UI only — no RBAC, no CRUD, no real CSV. Read-only on `useProductStore`; orders/members/sales use mock arrays inline. `products/new` is a 5-section form with sticky preview sidebar — submit is a no-op.
 - **Design ref**: 14 screens at `/_design/*` (locked)
 
 ### 🔴 Not built (priority order)
 1. **Backend** — every store is mock. Spec at `docs/api.md`. Migrate stores one at a time, swap loaders inside while keeping the public Pinia API stable.
-2. **Admin console** `/admin/*` — designs ready at `/_design/admin/*` (5 screens), need responsive port + RBAC + CRUD + charts + CSV export.
+2. **Admin functionality** — shell + 5 views ship as visual ports. Still needed: RBAC gate (auth store has no `role` yet), product/order CRUD, real CSV export, live charts.
 3. **Misc**: `/sell` (seller signup), real social auth, real PG payment, real OTP. Currently mocks.
 
 ## Working with the design reference

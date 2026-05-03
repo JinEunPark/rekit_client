@@ -14,6 +14,7 @@ const isDesignIndex = computed(() => route.path === '/_design')
 const isAuth = computed(() => route.path.startsWith('/auth'))
 const isCheckout = computed(() => route.path.startsWith('/checkout'))
 const isSearch = computed(() => route.path === '/search')
+const isAdmin = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
 
 const stage = computed(() => {
   if (route.path.startsWith('/_design/buyer')) return 'phone'
@@ -46,6 +47,9 @@ const stage = computed(() => {
 
   <!-- Search (blank layout, focused — has own back + search bar) -->
   <RouterView v-else-if="isSearch" />
+
+  <!-- Admin (own shell with sidebar + header) -->
+  <RouterView v-else-if="isAdmin" />
 
   <!-- Real app -->
   <div v-else class="app" :class="{ 'app--focused': isCheckout }">
