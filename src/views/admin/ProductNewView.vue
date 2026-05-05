@@ -73,7 +73,7 @@ const discountPct = computed(() => {
 </script>
 
 <template>
-  <AdminShell active="products" title="상품 등록" subtitle="새 철거 가전 상품을 등록합니다">
+  <AdminShell active="products" title="상품 등록" subtitle="새 폐업 가전 상품을 등록합니다">
     <template #header-right>
       <Button variant="secondary" size="sm">임시저장</Button>
       <RouterLink to="/admin/products" class="cancel-link">
@@ -302,7 +302,7 @@ const discountPct = computed(() => {
             <IconBase name="warning" :size="16" />
             <div>
               <div class="callout__t">A/S 불가 안내가 자동 표시됩니다</div>
-              <div class="callout__b">철거 가전 특성상 제조사 A/S는 적용되지 않습니다. 단, 배송 후 7일 내 동작 불량 발견 시 무상 교환·환불됩니다.</div>
+              <div class="callout__b">폐업 매장에서 입고된 가전 특성상 제조사 A/S는 적용되지 않습니다. 단, 배송 후 7일 내 동작 불량 발견 시 무상 교환·환불됩니다.</div>
             </div>
           </div>
         </section>

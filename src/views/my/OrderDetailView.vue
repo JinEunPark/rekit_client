@@ -5,7 +5,9 @@ import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
+import DepositInfoCard from '@/components/checkout/DepositInfoCard.vue'
 import { useOrderStore, type OrderStatus } from '@/stores/orders'
+import { isAwaitingDeposit, statusTone } from '@/stores/orders-helpers'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,18 +20,18 @@ onBeforeMount(() => {
   if (!order.value) router.replace('/my/orders')
 })
 
-const STATUS_FLOW: OrderStatus[] = ['결제완료', '준비중', '배송중', '배송완료']
+const STATUS_FLOW: OrderStatus[] = ['입금대기', '결제완료', '준비중', '배송중', '배송완료']
 const currentStepIdx = computed(() => {
   if (!order.value) return -1
+  // 결제확인요청 is collapsed into the 입금대기 step from the buyer's perspective
+  if (order.value.status === '결제확인요청') return 0
   return STATUS_FLOW.indexOf(order.value.status)
 })
 
-function statusTone(s: OrderStatus): 'info' | 'a' | 'accent' | 'danger' {
-  if (s === '결제완료') return 'info'
-  if (s === '준비중') return 'a'
-  if (s === '배송중') return 'info'
-  if (s === '배송완료') return 'accent'
-  return 'danger'
+const awaitingDeposit = computed(() => !!order.value && isAwaitingDeposit(order.value.status))
+
+function markPaid() {
+  if (order.value) orders.markPaymentRequested(order.value.id)
 }
 
 function formatDate(iso: string) {
@@ -84,6 +86,20 @@ function formatDate(iso: string) {
         </template>
       </div>
     </section>
+
+    <!-- Deposit info (입금대기 / 결제확인요청) -->
+    <template v-if="awaitingDeposit">
+      <DepositInfoCard :amount="order.total" :order-id="order.id" />
+      <div v-if="order.status === '입금대기'" class="paid-cta">
+        <Button variant="accent" size="lg" full @click="markPaid">
+          입금 완료했어요
+        </Button>
+      </div>
+      <div v-else class="requested">
+        <IconBase name="check" :size="16" />
+        <span>입금 확인 요청이 접수됐어요. 운영자가 곧 확인합니다.</span>
+      </div>
+    </template>
 
     <!-- Items -->
     <section class="block">
@@ -425,4 +441,22 @@ function formatDate(iso: string) {
   display: flex;
   gap: 8px;
 }
+
+.paid-cta {
+  margin-bottom: 12px;
+}
+.requested {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--rekit-accent-soft);
+  border: 1px solid #cce4d6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rekit-accent-ink);
+  margin-bottom: 12px;
+}
+.requested svg { color: var(--rekit-accent-deep); }
 </style>

@@ -1,10 +1,14 @@
 # Rekit — Project context for AI assistants
 
-> Vue 3 e-commerce app for **rekit** (철거 가전 직거래 플랫폼). This file is auto-loaded; read it before answering or editing.
+> Vue 3 e-commerce app for **rekit** (폐업 가전 직거래 플랫폼 — many products are commercial/영업용). This file is auto-loaded; read it before answering or editing.
 
 ## What is rekit
 
-A marketplace for inspecting and reselling appliances rescued from 철거 (demolition) sites — average 73% off retail. Mobile-first responsive, mint/sage green accent. Brand was renamed from "rekle" to **rekit** (trademark conflict). **Never reintroduce "rekle"** — folder name `/rekle/` is the only legacy reference left intact (renaming would disrupt IDE state; user can `mv` manually).
+A marketplace for inspecting and reselling appliances sourced from **closing businesses** (폐업 매장 — cafes, restaurants, retail) — average 73% off retail. Inventory skews **commercial-grade (영업용)** because the supply pipeline is closure-cleanup contractors, not residential demolition. Mobile-first responsive, mint/sage green accent.
+
+**Brand & wording rules — never break:**
+- Renamed from "rekle" to **rekit** (trademark conflict). **Never reintroduce "rekle"** — folder name `/rekle/` is the only legacy reference left (renaming would disrupt IDE state; user can `mv` manually).
+- Pivoted from **철거 (demolition)** narrative → **폐업 (business closure)** narrative because "철거 현장" felt off-putting to consumers. **Never reintroduce "철거 현장" / "철거 가전" / "협력 철거 업체"** in user-facing copy. Use "폐업 매장", "폐업 가전", "협력 정리 업체" instead. Highlight "영업용 가전이 많다" where natural.
 
 ## Stack
 

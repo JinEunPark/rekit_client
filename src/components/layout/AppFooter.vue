@@ -8,7 +8,7 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
     <div class="ft__inner">
       <div class="ft__brand">
         <RekitLogo :size="20" />
-        <p>철거 현장의 가전을 다시 살리는 직거래 플랫폼.</p>
+        <p>폐업 매장의 영업용 가전을 다시 살리는 직거래 플랫폼.</p>
       </div>
 
       <div class="ft__links">

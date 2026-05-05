@@ -1286,7 +1286,7 @@ id, userId?, topic, email, message, orderId?, status (NEW/IN_PROGRESS/RESOLVED),
 다음 도메인은 클라이언트 미구현 상태이므로 우선순위 낮음:
 
 - **Admin**: `/admin/*` — 대시보드 통계, 상품 등록/수정, 주문 처리, 회원 관리, 매출 정산. 권한 체계 (RBAC) 필요.
-- **Seller**: `/sell` 판매자 등록 — 협력 철거업체 입점 신청 폼.
+- **Seller**: `/sell` 판매자 등록 — 협력 정리업체(폐업 매장 회수 파트너) 입점 신청 폼.
 - **Notifications**: 푸시·SMS·이메일 알림 발송 시스템.
 - **Reviews**: 상품 후기 (디자인 미완)
 - **Coupons / Points**: 할인쿠폰·적립금 (디자인 미완)

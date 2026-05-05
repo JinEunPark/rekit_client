@@ -15,7 +15,6 @@ import {
   type DeliveryMethod,
   type OrderAddress,
   type OrderLineItem,
-  type PaymentMethod,
 } from '@/stores/orders'
 import { useAddressStore } from '@/stores/addresses'
 
@@ -83,15 +82,8 @@ const shippingFee = computed(
 
 /* ────────────── Payment ────────────── */
 
-const paymentMethod = ref<PaymentMethod>('card')
-const paymentOptions: { key: PaymentMethod; label: string }[] = [
-  { key: 'card', label: '신용카드' },
-  { key: 'bank', label: '계좌이체' },
-  { key: 'easy', label: '간편결제' },
-]
-const paymentLabel = computed(
-  () => paymentOptions.find((o) => o.key === paymentMethod.value)?.label ?? '신용카드',
-)
+// 계좌이체(무통장입금) only — fixed company account, deposit-name matching by orderId.
+const paymentLabel = '계좌이체 (무통장입금)'
 
 /* ────────────── Totals ────────────── */
 
@@ -142,8 +134,8 @@ function pay() {
     shippingFee: shippingFee.value,
     total: finalTotal.value,
     deliveryMethod: deliveryMethod.value,
-    paymentMethod: paymentMethod.value,
-    paymentMethodLabel: paymentLabel.value,
+    paymentMethod: 'bank',
+    paymentMethodLabel: paymentLabel,
     address: { ...address.value },
   })
 
@@ -288,23 +280,19 @@ function pay() {
         </div>
       </section>
 
-      <!-- Payment method -->
+      <!-- Payment method (계좌이체 only) -->
       <section class="block">
-        <h2 class="block__title">결제 수단</h2>
-        <div class="pays">
-          <label
-            v-for="o in paymentOptions"
-            :key="o.key"
-            class="pay"
-            :class="{ 'pay--on': paymentMethod === o.key }"
-          >
-            <input v-model="paymentMethod" type="radio" :value="o.key" />
-            {{ o.label }}
-          </label>
+        <h2 class="block__title">결제 방법</h2>
+        <div class="pay-only">
+          <div class="pay-only__head">
+            <IconBase name="wallet" :size="18" />
+            <span>계좌이체 (무통장입금)</span>
+          </div>
+          <p class="pay-only__b">
+            주문하기 버튼을 누르면 다음 화면에서 입금 계좌와 입금자명을 안내드립니다.
+            영업일 9~18시 기준 평균 2시간 내 입금이 확인됩니다.
+          </p>
         </div>
-        <p class="pays__note">
-          카드 정보는 결제 위젯에서 안전하게 처리되며 rekit 서버에 저장되지 않습니다.
-        </p>
       </section>
 
       <!-- Total card -->
@@ -326,7 +314,7 @@ function pay() {
       <!-- Inline CTA (desktop) -->
       <div class="inline-cta">
         <Button type="submit" variant="accent" size="lg" full>
-          {{ won(finalTotal) }} 결제하기
+          {{ won(finalTotal) }} 주문하기
         </Button>
       </div>
     </form>
@@ -572,37 +560,28 @@ function pay() {
   font-weight: 700;
 }
 
-/* payment radio pills */
-.pays {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.pay {
-  text-align: center;
-  padding: 14px 0;
-  background: var(--rekit-surface);
-  border: 1px solid var(--rekit-border);
+/* payment (계좌이체 only) */
+.pay-only {
+  background: var(--rekit-accent-soft);
+  border: 1px solid #cce4d6;
   border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  letter-spacing: -0.015em;
+  padding: 14px 16px;
 }
-.pay input {
-  display: none;
-}
-.pay--on {
-  border-color: var(--rekit-ink);
-  border-width: 2px;
-  padding: 13px 0;
+.pay-only__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 700;
+  color: var(--rekit-accent-ink);
 }
-.pays__note {
-  margin: 10px 0 0;
-  font-size: 11.5px;
-  color: var(--rekit-ink-subtle);
-  line-height: 1.5;
+.pay-only__head svg { color: var(--rekit-accent-deep); }
+.pay-only__b {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--rekit-accent-ink);
+  line-height: 1.55;
+  opacity: 0.85;
 }
 
 /* total card (dark) */

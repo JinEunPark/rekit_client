@@ -2,8 +2,8 @@ import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 export type DeliveryMethod = 'direct' | 'cargo'
-export type PaymentMethod = 'card' | 'bank' | 'easy'
-export type OrderStatus = '결제완료' | '준비중' | '배송중' | '배송완료' | '취소'
+export type PaymentMethod = 'bank'
+export type OrderStatus = '입금대기' | '결제확인요청' | '결제완료' | '준비중' | '배송중' | '배송완료' | '취소'
 
 export interface OrderAddress {
   recipient: string
@@ -91,7 +91,7 @@ export const useOrderStore = defineStore('orders', () => {
       ...input,
       id: generateOrderId(),
       createdAt: new Date().toISOString(),
-      status: '결제완료',
+      status: '입금대기',
       estimatedDelivery: estimateDelivery(input.deliveryMethod),
     }
     orders.value = [order, ...orders.value]
@@ -102,5 +102,22 @@ export const useOrderStore = defineStore('orders', () => {
     return orders.value.find((o) => o.id === id)
   }
 
-  return { orders, create, findById }
+  function setStatus(id: string, status: OrderStatus): void {
+    const o = orders.value.find((x) => x.id === id)
+    if (o) o.status = status
+  }
+
+  function markPaymentRequested(id: string): void {
+    const o = orders.value.find((x) => x.id === id)
+    if (o && o.status === '입금대기') o.status = '결제확인요청'
+  }
+
+  function approvePayment(id: string): void {
+    const o = orders.value.find((x) => x.id === id)
+    if (o && (o.status === '입금대기' || o.status === '결제확인요청')) {
+      o.status = '결제완료'
+    }
+  }
+
+  return { orders, create, findById, setStatus, markPaymentRequested, approvePayment }
 })

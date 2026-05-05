@@ -7,13 +7,15 @@ import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderStore, type OrderStatus } from '@/stores/orders'
+import { isAwaitingDeposit, statusTone } from '@/stores/orders-helpers'
 
 const route = useRoute()
 const auth = useAuthStore()
 const orders = useOrderStore()
 
-const FILTERS: { key: OrderStatus | 'all'; label: string }[] = [
+const FILTERS: { key: OrderStatus | 'all' | '입금'; label: string }[] = [
   { key: 'all', label: '전체' },
+  { key: '입금', label: '입금 안내' },
   { key: '결제완료', label: '결제완료' },
   { key: '준비중', label: '준비중' },
   { key: '배송중', label: '배송중' },
@@ -21,30 +23,23 @@ const FILTERS: { key: OrderStatus | 'all'; label: string }[] = [
   { key: '취소', label: '취소' },
 ]
 
-const filter = ref<OrderStatus | 'all'>(
-  (route.query.status as OrderStatus | 'all') ?? 'all',
-)
+type FilterKey = OrderStatus | 'all' | '입금'
+const filter = ref<FilterKey>((route.query.status as FilterKey) ?? 'all')
 
 const filteredOrders = computed(() => {
   if (filter.value === 'all') return orders.orders
+  if (filter.value === '입금') return orders.orders.filter((o) => isAwaitingDeposit(o.status))
   return orders.orders.filter((o) => o.status === filter.value)
 })
 
 const counts = computed(() => {
-  const map: Partial<Record<OrderStatus | 'all', number>> = { all: orders.orders.length }
+  const map: Partial<Record<FilterKey, number>> = { all: orders.orders.length, 입금: 0 }
   for (const o of orders.orders) {
     map[o.status] = (map[o.status] ?? 0) + 1
+    if (isAwaitingDeposit(o.status)) map['입금'] = (map['입금'] ?? 0) + 1
   }
   return map
 })
-
-function statusTone(status: OrderStatus): 'info' | 'a' | 'accent' | 'danger' {
-  if (status === '결제완료') return 'info'
-  if (status === '준비중') return 'a'
-  if (status === '배송중') return 'info'
-  if (status === '배송완료') return 'accent'
-  return 'danger'
-}
 
 function formatDate(iso: string) {
   const d = new Date(iso)

@@ -100,7 +100,7 @@ const hasNonCategoryFilters = computed(
         {{ activeCategory.slug === 'all' ? '모든 가전' : activeCategory.label }}
       </h1>
       <div class="list__sub">
-        검수를 통과한 철거 현장 가전을 만나보세요
+        검수를 통과한 폐업 매장의 영업용 가전을 만나보세요
       </div>
     </header>
 

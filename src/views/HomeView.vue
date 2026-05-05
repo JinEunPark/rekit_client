@@ -4,40 +4,8 @@ import { PRODUCTS, type ApplianceKind } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import ApplianceGlyph from '@/components/ds/ApplianceGlyph.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
+import HomePromiseModal from '@/components/home/HomePromiseModal.vue'
 import type { IconName } from '@/design/icons'
-
-type PromiseCard = {
-  glyph?: ApplianceKind
-  icon?: IconName
-  tint: 'mint' | 'sand' | 'sage'
-  title: string
-  desc: string
-  badge: string
-}
-
-const promises: PromiseCard[] = [
-  {
-    glyph: 'fridge',
-    tint: 'mint',
-    title: '모든 상품은 입고 시\n작동을 확인해요',
-    desc: '검수를 통과한 상품만 등록되며, 도착 후 7일 이내 동작 불량은 전액 환불해드려요.',
-    badge: '동작 보증',
-  },
-  {
-    icon: 'truck',
-    tint: 'sand',
-    title: '서울·경기는 당일\n직배송도 가능해요',
-    desc: '대형가전 전문 기사가 운반·설치까지 함께 진행해요. 무거운 가전, 걱정하지 않아도 돼요.',
-    badge: '직배송',
-  },
-  {
-    icon: 'leaf',
-    tint: 'sage',
-    title: '새 가전 가격의\n70~80% 정도예요',
-    desc: '철거 현장에서 바로 도착해 평균 73% 할인. 합리적인 소비이자 친환경적인 선택이에요.',
-    badge: '합리적',
-  },
-]
 
 const categories: { id: string; label: string; kind: ApplianceKind | null; icon?: IconName }[] = [
   { id: 'fridge', label: '냉장고', kind: 'fridge' },
@@ -58,7 +26,7 @@ const featured = PRODUCTS.slice(0, 8)
     <!-- Intro ribbon -->
     <RouterLink to="/guide" class="intro">
       <span class="intro__dot" />
-      <span class="intro__text">철거 현장에서 바로 도착, 평균 73% 할인</span>
+      <span class="intro__text">폐업 매장 영업용 가전, 평균 73% 할인</span>
       <IconBase name="chevronRight" :size="14" class="intro__chevron" />
     </RouterLink>
 
@@ -98,31 +66,7 @@ const featured = PRODUCTS.slice(0, 8)
       </div>
     </section>
 
-    <!-- Promise cards -->
-    <section class="promise">
-      <header class="promise__head">
-        <div class="promise__kicker">REKIT PROMISE</div>
-        <h2 class="promise__h">rekit만의 약속</h2>
-        <p class="promise__sub">철거 가전이지만 새 가전처럼 만나보세요</p>
-      </header>
-      <div class="promise__grid">
-        <article
-          v-for="p in promises"
-          :key="p.badge"
-          class="pcard"
-          :class="`pcard--${p.tint}`"
-        >
-          <div class="pcard__avatar">
-            <ApplianceGlyph v-if="p.glyph" :kind="p.glyph" />
-            <IconBase v-else-if="p.icon" :name="p.icon" :size="40" :stroke="1.5" />
-          </div>
-          <h3 class="pcard__title">{{ p.title }}</h3>
-          <p class="pcard__desc">{{ p.desc }}</p>
-          <span class="pcard__badge">{{ p.badge }}</span>
-        </article>
-      </div>
-    </section>
-
+    <HomePromiseModal />
   </div>
 </template>
 
@@ -182,135 +126,6 @@ const featured = PRODUCTS.slice(0, 8)
 @media (min-width: 768px) {
   .home {
     padding: 24px 32px 56px;
-  }
-}
-
-/* ====== PROMISE ====== */
-.promise {
-  margin: 56px -16px 0;
-  padding: 56px 16px;
-  background: var(--rekit-surface-muted);
-}
-
-.promise__head {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.promise__kicker {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--rekit-accent-deep);
-}
-
-.promise__h {
-  margin: 8px 0 0;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-}
-
-.promise__sub {
-  margin: 8px 0 0;
-  font-size: 13.5px;
-  color: var(--rekit-ink-muted);
-}
-
-.promise__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-/* card */
-.pcard {
-  background: var(--rekit-surface);
-  border-radius: 24px;
-  padding: 32px 28px 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.03), 0 8px 24px rgba(20, 20, 15, 0.04);
-}
-
-.pcard__avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-
-.pcard--mint .pcard__avatar {
-  background: #e9f4ee;
-  color: var(--rekit-accent-deep);
-}
-.pcard--sand .pcard__avatar {
-  background: #f3ebdb;
-  color: #9b6e2e;
-}
-.pcard--sage .pcard__avatar {
-  background: #ecedd9;
-  color: #5e7150;
-}
-
-.pcard__avatar > svg {
-  width: 56px;
-  height: 56px;
-}
-
-.pcard__title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.35;
-  white-space: pre-line;
-}
-
-.pcard__desc {
-  margin: 16px 0 0;
-  font-size: 13.5px;
-  color: var(--rekit-ink-muted);
-  line-height: 1.65;
-}
-
-.pcard__badge {
-  margin-top: 24px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--rekit-accent-soft);
-  color: var(--rekit-accent-deep);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-@media (min-width: 768px) {
-  .promise {
-    margin: 72px -32px 0;
-    padding: 80px 32px;
-  }
-  .promise__h {
-    font-size: 30px;
-  }
-  .promise__sub {
-    font-size: 14.5px;
-  }
-  .promise__grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-  }
-  .pcard {
-    padding: 40px 36px 32px;
-  }
-  .pcard__title {
-    font-size: 22px;
   }
 }
 
