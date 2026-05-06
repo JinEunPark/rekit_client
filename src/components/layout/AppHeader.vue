@@ -84,7 +84,7 @@ const drawerOpen = ref(false)
           >
             <span class="hd__drawer-avatar">{{ auth.initial }}</span>
             <span class="hd__drawer-name">
-              {{ auth.user.name }} 님
+              {{ auth.user.username }} 님
               <span class="hd__drawer-mail">{{ auth.user.email }}</span>
             </span>
             <IconBase name="chevronRight" :size="14" />

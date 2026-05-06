@@ -75,7 +75,7 @@ function logout() {
         <div class="profile__avatar">{{ auth.initial }}</div>
         <div class="profile__info">
           <div class="profile__name">
-            {{ auth.user.name }} 님
+            {{ auth.user.username }} 님
             <Badge v-if="auth.user.verified" tone="accent" size="xs">
               <IconBase name="shield" :size="9" /> 인증완료
             </Badge>

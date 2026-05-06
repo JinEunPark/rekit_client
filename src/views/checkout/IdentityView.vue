@@ -47,7 +47,7 @@ function submit(e: Event) {
   auth.user.verified = true
   auth.user.phone = phone.value
   // persist immediately
-  localStorage.setItem('rekit.auth.user.v2', JSON.stringify(auth.user))
+  localStorage.setItem('rekit.auth.user.v3', JSON.stringify(auth.user))
   router.replace('/checkout/order')
 }
 </script>

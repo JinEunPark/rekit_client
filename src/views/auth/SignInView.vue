@@ -10,19 +10,19 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const username = ref('')
+const loginId = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const remember = ref(true)
-const usernameFocused = ref(false)
+const loginIdFocused = ref(false)
 const passwordFocused = ref(false)
 
-const canSubmit = computed(() => username.value.trim().length >= 4 && password.value.length >= 6)
+const canSubmit = computed(() => loginId.value.trim().length >= 4 && password.value.length >= 6)
 
 function submit(e: Event) {
   e.preventDefault()
   if (!canSubmit.value) return
-  auth.login({ username: username.value.trim() })
+  auth.login({ loginId: loginId.value.trim() })
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
   router.replace(redirect)
 }
@@ -45,19 +45,19 @@ function submit(e: Event) {
       </header>
 
       <form class="auth__form" @submit="submit">
-        <label class="field" :class="{ 'field--focus': usernameFocused }">
+        <label class="field" :class="{ 'field--focus': loginIdFocused }">
           <span class="field__label">아이디</span>
           <div class="field__row">
             <input
-              v-model="username"
+              v-model="loginId"
               type="text"
               autocomplete="username"
               autocapitalize="off"
               autocorrect="off"
               spellcheck="false"
               placeholder="아이디"
-              @focus="usernameFocused = true"
-              @blur="usernameFocused = false"
+              @focus="loginIdFocused = true"
+              @blur="loginIdFocused = false"
             />
           </div>
         </label>

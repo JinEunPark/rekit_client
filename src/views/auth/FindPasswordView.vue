@@ -5,14 +5,14 @@ import IconBase from '@/components/ds/IconBase.vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import Button from '@/components/ds/Button.vue'
 
-const username = ref('')
+const loginId = ref('')
 const email = ref('')
-const usernameFocused = ref(false)
+const loginIdFocused = ref(false)
 const emailFocused = ref(false)
 
-const usernameValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(username.value.trim()))
+const loginIdValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(loginId.value.trim()))
 const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
-const canSubmit = computed(() => usernameValid.value && emailValid.value)
+const canSubmit = computed(() => loginIdValid.value && emailValid.value)
 
 const sent = ref(false)
 
@@ -53,19 +53,19 @@ function reset() {
         </header>
 
         <form class="auth__form" @submit="submit">
-          <label class="field" :class="{ 'field--focus': usernameFocused }">
+          <label class="field" :class="{ 'field--focus': loginIdFocused }">
             <span class="field__label">아이디</span>
             <div class="field__row">
               <input
-                v-model="username"
+                v-model="loginId"
                 type="text"
                 autocomplete="username"
                 autocapitalize="off"
                 autocorrect="off"
                 spellcheck="false"
                 placeholder="아이디"
-                @focus="usernameFocused = true"
-                @blur="usernameFocused = false"
+                @focus="loginIdFocused = true"
+                @blur="loginIdFocused = false"
               />
             </div>
           </label>

@@ -11,13 +11,13 @@ const emailFocused = ref(false)
 const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
 
 interface FoundResult {
-  username: string
+  loginId: string
   joinedAt: string
 }
 
 const found = ref<FoundResult | null>(null)
 
-function maskUsername(u: string) {
+function maskLoginId(u: string) {
   if (u.length <= 6) return `${u.slice(0, 1)}***${u.slice(-1)}`
   return `${u.slice(0, 4)}***${u.slice(-3)}`
 }
@@ -27,7 +27,7 @@ function submit(e: Event) {
   if (!emailValid.value) return
   // mock — any email returns the demo account
   found.value = {
-    username: 'eunyoung_kim',
+    loginId: 'eunyoung_kim',
     joinedAt: '2026.04.10',
   }
 }
@@ -92,7 +92,7 @@ function reset() {
 
           <div class="result__id">
             <div class="result__label">회원님의 아이디</div>
-            <div class="result__value">{{ maskUsername(found.username) }}</div>
+            <div class="result__value">{{ maskLoginId(found.loginId) }}</div>
             <div class="result__meta">가입일 · {{ found.joinedAt }}</div>
           </div>
 

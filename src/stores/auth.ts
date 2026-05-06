@@ -2,17 +2,19 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 export interface User {
-  /** Account ID for login. */
+  /** Login ID (username on server). */
+  loginId: string
+  /** Display name (user-entered). */
   username: string
   email: string
-  name: string
   /** Set later by 본인인증 (identity verification) flow before checkout. */
   phone?: string
   verified: boolean
   ecoKg: number
 }
 
-const STORAGE_KEY = 'rekit.auth.user.v2'
+// 스키마 변경 (username → loginId, name → username) → 기존 v2 캐시는 무효화.
+const STORAGE_KEY = 'rekit.auth.user.v3'
 
 function loadUser(): User | null {
   if (typeof localStorage === 'undefined') return null
@@ -27,7 +29,7 @@ function loadUser(): User | null {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(loadUser())
   const isAuthenticated = computed(() => user.value !== null)
-  const initial = computed(() => (user.value ? user.value.name.charAt(0) : ''))
+  const initial = computed(() => (user.value ? user.value.username.charAt(0) : ''))
 
   function persist() {
     if (typeof localStorage === 'undefined') return
@@ -41,11 +43,11 @@ export const useAuthStore = defineStore('auth', () => {
    * so the screen has something to render.
    */
   function login(input: Partial<User> = {}) {
-    const username = input.username ?? 'eunyoung_kim'
+    const loginId = input.loginId ?? 'eunyoung_kim'
     user.value = {
-      username,
-      name: input.name ?? '박은영',
-      email: input.email ?? `${username}@rekit.kr`,
+      loginId,
+      username: input.username ?? '박은영',
+      email: input.email ?? `${loginId}@rekit.kr`,
       phone: input.phone,
       verified: input.verified ?? false,
       ecoKg: input.ecoKg ?? 86,

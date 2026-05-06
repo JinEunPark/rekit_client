@@ -10,25 +10,28 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
+const loginId = ref('')
 const username = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
 const email = ref('')
 const showPassword = ref(false)
 
+const loginIdFocused = ref(false)
 const usernameFocused = ref(false)
 const passwordFocused = ref(false)
 const passwordConfirmFocused = ref(false)
 const emailFocused = ref(false)
 
 type CheckState = 'idle' | 'checking' | 'available' | 'taken'
-const usernameCheck = ref<CheckState>('idle')
+const loginIdCheck = ref<CheckState>('idle')
 
-watch(username, () => {
-  usernameCheck.value = 'idle'
+watch(loginId, () => {
+  loginIdCheck.value = 'idle'
 })
 
-const usernameValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(username.value.trim()))
+const loginIdValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(loginId.value.trim()))
+const usernameValid = computed(() => username.value.trim().length >= 1)
 const passwordValid = computed(() => password.value.length >= 8 && /[a-zA-Z]/.test(password.value) && /[0-9]/.test(password.value))
 const passwordsMatch = computed(
   () => passwordConfirm.value.length > 0 && passwordConfirm.value === password.value,
@@ -48,19 +51,20 @@ function toggleAll() {
   agreeMarketing.value = next
 }
 
-function checkUsername() {
-  if (!usernameValid.value) return
-  usernameCheck.value = 'checking'
-  // mock — names containing 'admin' are taken; everything else is available
+function checkLoginId() {
+  if (!loginIdValid.value) return
+  loginIdCheck.value = 'checking'
+  // mock — ids containing 'admin/root/test' are taken; everything else is available
   setTimeout(() => {
-    usernameCheck.value = /admin|root|test/i.test(username.value) ? 'taken' : 'available'
+    loginIdCheck.value = /admin|root|test/i.test(loginId.value) ? 'taken' : 'available'
   }, 500)
 }
 
 const canSubmit = computed(
   () =>
+    loginIdValid.value &&
+    loginIdCheck.value === 'available' &&
     usernameValid.value &&
-    usernameCheck.value === 'available' &&
     passwordValid.value &&
     passwordsMatch.value &&
     emailValid.value &&
@@ -71,6 +75,7 @@ function submit(e: Event) {
   e.preventDefault()
   if (!canSubmit.value) return
   auth.login({
+    loginId: loginId.value.trim(),
     username: username.value.trim(),
     email: email.value.trim() || undefined,
   })
@@ -96,48 +101,63 @@ function submit(e: Event) {
       </header>
 
       <form class="auth__form" @submit="submit">
-        <!-- Username -->
-        <label class="field" :class="{ 'field--focus': usernameFocused }">
+        <!-- Login ID -->
+        <label class="field" :class="{ 'field--focus': loginIdFocused }">
           <span class="field__label">아이디</span>
           <div class="field__row">
             <input
-              v-model="username"
+              v-model="loginId"
               type="text"
               autocomplete="username"
               autocapitalize="off"
               autocorrect="off"
               spellcheck="false"
               placeholder="영문·숫자·_ 4~20자"
-              @focus="usernameFocused = true"
-              @blur="usernameFocused = false"
+              @focus="loginIdFocused = true"
+              @blur="loginIdFocused = false"
             />
             <button
               type="button"
               class="field__action"
-              :disabled="!usernameValid || usernameCheck === 'checking'"
-              @click="checkUsername"
+              :disabled="!loginIdValid || loginIdCheck === 'checking'"
+              @click="checkLoginId"
             >
-              {{ usernameCheck === 'checking' ? '확인 중' : '중복확인' }}
+              {{ loginIdCheck === 'checking' ? '확인 중' : '중복확인' }}
             </button>
           </div>
           <span
-            v-if="usernameCheck === 'available'"
+            v-if="loginIdCheck === 'available'"
             class="field__hint field__hint--ok"
           >
             <IconBase name="check" :size="12" :stroke="2.4" /> 사용 가능한 아이디예요
           </span>
           <span
-            v-else-if="usernameCheck === 'taken'"
+            v-else-if="loginIdCheck === 'taken'"
             class="field__hint field__hint--err"
           >
             <IconBase name="warning" :size="12" /> 이미 사용 중인 아이디예요
           </span>
           <span
-            v-else-if="username.length > 0 && !usernameValid"
+            v-else-if="loginId.length > 0 && !loginIdValid"
             class="field__hint field__hint--muted"
           >
             영문·숫자·_ 조합으로 4~20자 입력해 주세요
           </span>
+        </label>
+
+        <!-- Username (display name) -->
+        <label class="field" :class="{ 'field--focus': usernameFocused }">
+          <span class="field__label">이름</span>
+          <div class="field__row">
+            <input
+              v-model="username"
+              type="text"
+              autocomplete="name"
+              placeholder="화면에 표시될 이름"
+              @focus="usernameFocused = true"
+              @blur="usernameFocused = false"
+            />
+          </div>
         </label>
 
         <!-- Password -->

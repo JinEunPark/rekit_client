@@ -11,13 +11,13 @@ const auth = useAuthStore()
 
 const editing = ref(false)
 const form = reactive({
-  name: auth.user?.name ?? '',
+  name: auth.user?.username ?? '',
   email: auth.user?.email ?? '',
 })
 
 function startEdit() {
   if (!auth.user) return
-  form.name = auth.user.name
+  form.name = auth.user.username
   form.email = auth.user.email
   editing.value = true
 }
@@ -31,10 +31,10 @@ const canSave = computed(() => form.name.trim().length > 0 && emailValid.value)
 
 function save() {
   if (!auth.user || !canSave.value) return
-  auth.user.name = form.name.trim()
+  auth.user.username = form.name.trim()
   auth.user.email = form.email.trim()
   // persist immediately
-  localStorage.setItem('rekit.auth.user.v2', JSON.stringify(auth.user))
+  localStorage.setItem('rekit.auth.user.v3', JSON.stringify(auth.user))
   editing.value = false
 }
 
@@ -72,12 +72,12 @@ function deleteAccount() {
       <div class="profile__avatar">{{ auth.initial }}</div>
       <div class="profile__info">
         <div class="profile__name">
-          {{ auth.user.name }}
+          {{ auth.user.username }}
           <Badge v-if="auth.user.verified" tone="accent" size="xs">
             <IconBase name="shield" :size="9" /> 인증완료
           </Badge>
         </div>
-        <div class="profile__id">@{{ auth.user.username }}</div>
+        <div class="profile__id">@{{ auth.user.loginId }}</div>
       </div>
     </section>
 
@@ -92,11 +92,11 @@ function deleteAccount() {
       <dl v-if="!editing" class="info">
         <div class="info__row">
           <dt>이름</dt>
-          <dd>{{ auth.user.name }}</dd>
+          <dd>{{ auth.user.username }}</dd>
         </div>
         <div class="info__row">
           <dt>아이디</dt>
-          <dd>{{ auth.user.username }}</dd>
+          <dd>{{ auth.user.loginId }}</dd>
         </div>
         <div class="info__row">
           <dt>이메일</dt>
