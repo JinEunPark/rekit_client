@@ -61,7 +61,7 @@ onBeforeMount(() => {
 
 const saved = addresses.defaultAddress
 const address = ref<OrderAddress>({
-  recipient: saved?.recipient ?? auth.user?.name ?? '',
+  recipient: saved?.recipient ?? auth.user?.username ?? '',
   phone: saved?.phone ?? auth.user?.phone ?? '',
   zipcode: saved?.zipcode ?? '',
   address: saved?.address ?? '',
@@ -160,7 +160,7 @@ function pay() {
     <!-- Verified badge -->
     <div class="verified">
       <IconBase name="shield" :size="16" />
-      <span>본인인증 완료 · {{ auth.user?.name ?? '회원' }}</span>
+      <span>본인인증 완료 · {{ auth.user?.username ?? '회원' }}</span>
     </div>
 
     <form class="form" novalidate @submit.prevent="pay">

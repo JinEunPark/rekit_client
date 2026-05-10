@@ -29,7 +29,7 @@ const nav: { id: 'dashboard' | 'products' | 'orders' | 'members' | 'sales'; to: 
 const drawerOpen = ref(false)
 watch(() => route.path, () => { drawerOpen.value = false })
 
-const operatorName = computed(() => auth.user?.name ?? '운영자')
+const operatorName = computed(() => auth.user?.username ?? '운영자')
 const operatorInitial = computed(() => operatorName.value.charAt(0))
 </script>
 

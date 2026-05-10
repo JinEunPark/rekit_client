@@ -24,7 +24,7 @@ interface FormState {
 function blankForm(): FormState {
   return {
     label: '',
-    recipient: auth.user?.name ?? '',
+    recipient: auth.user?.username ?? '',
     phone: auth.user?.phone ?? '',
     zipcode: '',
     address: '',
