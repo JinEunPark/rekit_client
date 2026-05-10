@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import MobileTabBar from '@/components/layout/MobileTabBar.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
+
+onMounted(() => {
+  void auth.fetchMe()
+})
 
 const isDesignFrame = computed(() => route.path.startsWith('/_design/'))
 const isDesignIndex = computed(() => route.path === '/_design')

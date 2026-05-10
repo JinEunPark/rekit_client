@@ -12,6 +12,8 @@ const router = createRouter({
     { path: '/auth/sign-up', name: 'sign-up', component: () => import('../views/auth/SignUpView.vue') },
     { path: '/auth/find-id', name: 'find-id', component: () => import('../views/auth/FindIdView.vue') },
     { path: '/auth/find-password', name: 'find-password', component: () => import('../views/auth/FindPasswordView.vue') },
+    { path: '/auth/callback/:provider', name: 'auth-callback', component: () => import('../views/auth/CallbackView.vue') },
+    { path: '/auth/social/sign-up', name: 'social-sign-up', component: () => import('../views/auth/SocialSignUpView.vue') },
 
     // My page — handles unauthenticated state inline
     { path: '/my', name: 'my', component: () => import('../views/my/MyView.vue') },

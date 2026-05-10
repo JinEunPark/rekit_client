@@ -1,5 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getAccessToken, setAccessToken } from '@/api/client'
+import { signOut as apiSignOut } from '@/api/auth'
+import { getMe } from '@/api/users'
 
 export interface User {
   /** Login ID (username on server). */
@@ -13,7 +16,6 @@ export interface User {
   ecoKg: number
 }
 
-// 스키마 변경 (username → loginId, name → username) → 기존 v2 캐시는 무효화.
 const STORAGE_KEY = 'rekit.auth.user.v3'
 
 function loadUser(): User | null {
@@ -37,11 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
     else localStorage.removeItem(STORAGE_KEY)
   }
 
-  /**
-   * Mock login. Real backend will replace this with a token + profile fetch.
-   * Any field can be overridden; missing fields fall back to demo values
-   * so the screen has something to render.
-   */
   function login(input: Partial<User> = {}) {
     const loginId = input.loginId ?? 'eunyoung_kim'
     user.value = {
@@ -55,10 +52,46 @@ export const useAuthStore = defineStore('auth', () => {
     persist()
   }
 
-  function logout() {
+  function setSession(accessToken: string, profile: Partial<User> = {}) {
+    setAccessToken(accessToken)
+    login(profile)
+  }
+
+  async function fetchMe(): Promise<void> {
+    if (!getAccessToken()) return
+    try {
+      const me = await getMe()
+      user.value = {
+        loginId: me.loginId,
+        username: me.username,
+        email: me.email,
+        phone: me.phone ?? undefined,
+        verified: me.verified,
+        ecoKg: me.ecoKg,
+      }
+      persist()
+    } catch {
+      // 인증 만료는 인터셉터가 처리. 그 외(네트워크 등)는 placeholder 유지.
+    }
+  }
+
+  function clearLocal() {
+    setAccessToken(null)
     user.value = null
     persist()
   }
 
-  return { user, isAuthenticated, initial, login, logout }
+  function logout() {
+    const wasAuthenticated = isAuthenticated.value
+    clearLocal()
+    if (wasAuthenticated) {
+      apiSignOut().catch(() => undefined)
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('rekit:auth-expired', clearLocal)
+  }
+
+  return { user, isAuthenticated, initial, login, setSession, fetchMe, logout }
 })

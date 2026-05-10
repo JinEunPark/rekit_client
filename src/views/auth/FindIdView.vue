@@ -4,36 +4,50 @@ import { RouterLink } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import Button from '@/components/ds/Button.vue'
+import { findId } from '@/api/auth'
+import { ApiError } from '@/api/client'
 
 const email = ref('')
 const emailFocused = ref(false)
 
 const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
 
-interface FoundResult {
-  loginId: string
-  joinedAt: string
+const sent = ref(false)
+const submitting = ref(false)
+const errorMessage = ref('')
+const sentEmail = ref('')
+
+function maskEmail(addr: string): string {
+  const [local, domain] = addr.split('@')
+  if (!local || !domain) return addr
+  const visible = local.slice(0, Math.min(2, local.length))
+  return `${visible}***@${domain}`
 }
 
-const found = ref<FoundResult | null>(null)
-
-function maskLoginId(u: string) {
-  if (u.length <= 6) return `${u.slice(0, 1)}***${u.slice(-1)}`
-  return `${u.slice(0, 4)}***${u.slice(-3)}`
-}
-
-function submit(e: Event) {
+async function submit(e: Event) {
   e.preventDefault()
-  if (!emailValid.value) return
-  // mock — any email returns the demo account
-  found.value = {
-    loginId: 'eunyoung_kim',
-    joinedAt: '2026.04.10',
+  if (!emailValid.value || submitting.value) return
+  submitting.value = true
+  errorMessage.value = ''
+  try {
+    await findId(email.value.trim())
+    sentEmail.value = email.value.trim()
+    sent.value = true
+  } catch (err) {
+    errorMessage.value =
+      err instanceof ApiError
+        ? `${err.message} (${err.code})`
+        : err instanceof Error
+          ? err.message
+          : '요청에 실패했어요.'
+  } finally {
+    submitting.value = false
   }
 }
 
 function reset() {
-  found.value = null
+  sent.value = false
+  errorMessage.value = ''
 }
 </script>
 
@@ -49,10 +63,10 @@ function reset() {
       </div>
 
       <!-- Initial form -->
-      <template v-if="!found">
+      <template v-if="!sent">
         <header class="auth__head">
           <h1>아이디를 잊어버리셨나요?</h1>
-          <p>가입 시 등록한 이메일로 아이디를 찾을 수 있어요.</p>
+          <p>가입 시 등록한 이메일로 아이디를 보내드려요.</p>
         </header>
 
         <form class="auth__form" @submit="submit">
@@ -70,8 +84,16 @@ function reset() {
             </div>
           </label>
 
-          <Button type="submit" variant="accent" size="lg" full :disabled="!emailValid">
-            아이디 찾기
+          <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+          <Button
+            type="submit"
+            variant="accent"
+            size="lg"
+            full
+            :disabled="!emailValid || submitting"
+          >
+            {{ submitting ? '발송 중…' : '아이디 메일 받기' }}
           </Button>
 
           <div class="auth__alt">
@@ -81,20 +103,17 @@ function reset() {
         </form>
       </template>
 
-      <!-- Result -->
+      <!-- Sent state -->
       <template v-else>
         <div class="result">
           <div class="result__check">
             <IconBase name="check" :size="32" :stroke="2.6" />
           </div>
-          <h1 class="result__title">아이디를 찾았어요</h1>
-          <p class="result__sub">{{ email }}로 가입된 계정이에요.</p>
-
-          <div class="result__id">
-            <div class="result__label">회원님의 아이디</div>
-            <div class="result__value">{{ maskLoginId(found.loginId) }}</div>
-            <div class="result__meta">가입일 · {{ found.joinedAt }}</div>
-          </div>
+          <h1 class="result__title">아이디를 발송했어요</h1>
+          <p class="result__sub">
+            <b>{{ maskEmail(sentEmail) }}</b>로 가입 아이디를 보내드렸어요.<br />
+            5분 이내에 이메일을 확인해 주세요.
+          </p>
 
           <div class="result__actions">
             <RouterLink to="/auth/sign-in" class="auth-btn auth-btn--primary">
@@ -106,13 +125,13 @@ function reset() {
           </div>
 
           <button type="button" class="result__retry" @click="reset">
-            다른 이메일로 다시 찾기
+            다른 이메일로 다시 보내기
           </button>
         </div>
       </template>
 
       <!-- Bottom link -->
-      <div v-if="!found" class="auth__back-row">
+      <div v-if="!sent" class="auth__back-row">
         <RouterLink to="/auth/sign-in" class="auth__back">
           <IconBase name="chevronLeft" :size="14" /> 로그인으로 돌아가기
         </RouterLink>
@@ -260,6 +279,15 @@ function reset() {
   background: var(--rekit-surface-muted);
 }
 
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fde7e7;
+  color: #c0392b;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
 /* result */
 .result {
   text-align: center;
@@ -287,7 +315,11 @@ function reset() {
   margin: 8px 0 0;
   font-size: 13.5px;
   color: var(--rekit-ink-muted);
-  line-height: 1.55;
+  line-height: 1.65;
+}
+.result__sub b {
+  color: var(--rekit-ink);
+  font-weight: 700;
 }
 .result__id {
   margin: 24px 0 0;

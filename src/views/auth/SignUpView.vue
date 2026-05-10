@@ -5,6 +5,9 @@ import IconBase from '@/components/ds/IconBase.vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import Button from '@/components/ds/Button.vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildAuthorizeUrl, type OAuthProvider } from '@/config/oauth'
+import { checkLoginId as apiCheckLoginId, signIn as apiSignIn, signUp as apiSignUp } from '@/api/auth'
+import { ApiError } from '@/api/client'
 
 const router = useRouter()
 const route = useRoute()
@@ -51,13 +54,20 @@ function toggleAll() {
   agreeMarketing.value = next
 }
 
-function checkLoginId() {
-  if (!loginIdValid.value) return
+async function checkLoginId() {
+  if (!loginIdValid.value || loginIdCheck.value === 'checking') return
   loginIdCheck.value = 'checking'
-  // mock — ids containing 'admin/root/test' are taken; everything else is available
-  setTimeout(() => {
-    loginIdCheck.value = /admin|root|test/i.test(loginId.value) ? 'taken' : 'available'
-  }, 500)
+  try {
+    const result = await apiCheckLoginId(loginId.value.trim())
+    loginIdCheck.value = result.available ? 'available' : 'taken'
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      loginIdCheck.value = 'taken'
+    } else {
+      loginIdCheck.value = 'idle'
+      console.error('check-login-id 실패:', err)
+    }
+  }
 }
 
 const canSubmit = computed(
@@ -71,16 +81,64 @@ const canSubmit = computed(
     requiredAgreed.value,
 )
 
-function submit(e: Event) {
+const submitting = ref(false)
+const errorMessage = ref('')
+
+async function submit(e: Event) {
   e.preventDefault()
-  if (!canSubmit.value) return
-  auth.login({
-    loginId: loginId.value.trim(),
-    username: username.value.trim(),
-    email: email.value.trim() || undefined,
-  })
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  router.replace(redirect)
+  if (!canSubmit.value || submitting.value) return
+  submitting.value = true
+  errorMessage.value = ''
+  try {
+    const trimmedLoginId = loginId.value.trim()
+    await apiSignUp({
+      loginId: trimmedLoginId,
+      username: username.value.trim(),
+      password: password.value,
+      email: email.value.trim(),
+      agreedTerms: agreeTerms.value,
+      agreedPrivacy: agreePrivacy.value,
+      agreedMarketing: agreeMarketing.value,
+    })
+    // 백엔드 sign-up 은 token 을 반환하지 않음 → 동일 자격증명으로 즉시 로그인.
+    const tokens = await apiSignIn({
+      loginId: trimmedLoginId,
+      password: password.value,
+      remember: true,
+    })
+    auth.setSession(tokens.accessToken, {
+      loginId: trimmedLoginId,
+      username: username.value.trim(),
+      email: email.value.trim() || undefined,
+    })
+    void auth.fetchMe()
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    router.replace(redirect)
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.code === 'USERNAME_TAKEN' || err.code === 'LOGIN_ID_TAKEN') {
+        errorMessage.value = '이미 사용 중인 아이디예요.'
+        loginIdCheck.value = 'taken'
+      } else if (err.code === 'EMAIL_TAKEN') {
+        errorMessage.value = '이미 가입된 이메일이에요.'
+      } else {
+        errorMessage.value = `${err.message} (${err.code})`
+      }
+    } else {
+      errorMessage.value = err instanceof Error ? err.message : '가입에 실패했어요.'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+function startSocialLogin(provider: OAuthProvider) {
+  try {
+    window.location.href = buildAuthorizeUrl(provider)
+  } catch (err) {
+    console.error(err)
+    alert(err instanceof Error ? err.message : '소셜 로그인을 시작할 수 없습니다.')
+  }
 }
 </script>
 
@@ -272,8 +330,10 @@ function submit(e: Event) {
           </div>
         </fieldset>
 
-        <Button type="submit" variant="accent" size="lg" full :disabled="!canSubmit">
-          가입하고 시작하기
+        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+        <Button type="submit" variant="accent" size="lg" full :disabled="!canSubmit || submitting">
+          {{ submitting ? '가입 중…' : '가입하고 시작하기' }}
         </Button>
 
         <div class="auth__alt">
@@ -285,13 +345,59 @@ function submit(e: Event) {
       <div class="divider"><span>간편 가입</span></div>
 
       <div class="socials">
-        <button type="button" class="social social--kakao">
-          <span class="social__dot social__dot--kakao" />
+        <button type="button" class="social social--kakao" @click="startSocialLogin('kakao')">
+          <svg
+            class="social__logo"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fill="#3b1e1e"
+              d="M12 3.5C6.477 3.5 2 7.04 2 11.41c0 2.81 1.86 5.27 4.65 6.66-.2.74-.74 2.74-.85 3.16-.13.52.19.51.4.37.17-.11 2.66-1.81 3.74-2.55.68.1 1.37.16 2.06.16 5.523 0 10-3.54 10-7.91S17.523 3.5 12 3.5z"
+            />
+          </svg>
           카카오로 가입
         </button>
-        <button type="button" class="social social--naver">
-          <span class="social__dot social__dot--naver">N</span>
+        <button type="button" class="social social--naver" @click="startSocialLogin('naver')">
+          <svg
+            class="social__logo"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fill="#fff"
+              d="M16.273 12.845 7.376 0H0v24h7.726V11.156L16.624 24H24V0h-7.727z"
+            />
+          </svg>
           네이버로 가입
+        </button>
+        <button type="button" class="social social--google" @click="startSocialLogin('google')">
+          <svg
+            class="social__logo"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
+            />
+          </svg>
+          Google로 가입
         </button>
       </div>
     </main>
@@ -446,6 +552,15 @@ function submit(e: Event) {
   color: var(--rekit-ink-subtle);
 }
 
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fde7e7;
+  color: #c0392b;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
 /* agreements */
 .agree {
   margin-top: 4px;
@@ -578,22 +693,16 @@ function submit(e: Event) {
   background: #03c75a;
   color: #fff;
 }
-.social__dot {
+.social--google {
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid var(--rekit-border);
+}
+.social__logo {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-}
-.social__dot--kakao {
-  background: #3b1e1e;
-}
-.social__dot--naver {
-  color: #03c75a;
-  background: #fff;
+  display: block;
+  flex-shrink: 0;
 }
 
 @media (min-width: 768px) {

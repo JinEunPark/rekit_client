@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import Button from '@/components/ds/Button.vue'
+import { findPassword } from '@/api/auth'
+import { ApiError } from '@/api/client'
 
 const loginId = ref('')
 const email = ref('')
@@ -12,9 +14,15 @@ const emailFocused = ref(false)
 
 const loginIdValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(loginId.value.trim()))
 const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
-const canSubmit = computed(() => loginIdValid.value && emailValid.value)
 
+const submitting = ref(false)
 const sent = ref(false)
+const errorMessage = ref('')
+const sentEmail = ref('')
+
+const canSubmit = computed(
+  () => loginIdValid.value && emailValid.value && !submitting.value,
+)
 
 function maskEmail(addr: string): string {
   const [local, domain] = addr.split('@')
@@ -23,14 +31,30 @@ function maskEmail(addr: string): string {
   return `${visible}***@${domain}`
 }
 
-function submit(e: Event) {
+async function submit(e: Event) {
   e.preventDefault()
   if (!canSubmit.value) return
-  sent.value = true
+  submitting.value = true
+  errorMessage.value = ''
+  try {
+    const result = await findPassword(loginId.value.trim(), email.value.trim())
+    sentEmail.value = result.maskedEmail ?? maskEmail(email.value.trim())
+    sent.value = true
+  } catch (err) {
+    errorMessage.value =
+      err instanceof ApiError
+        ? `${err.message} (${err.code})`
+        : err instanceof Error
+          ? err.message
+          : '요청에 실패했어요.'
+  } finally {
+    submitting.value = false
+  }
 }
 
 function reset() {
   sent.value = false
+  errorMessage.value = ''
 }
 </script>
 
@@ -84,8 +108,10 @@ function reset() {
             </div>
           </label>
 
+          <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
           <Button type="submit" variant="accent" size="lg" full :disabled="!canSubmit">
-            재설정 링크 받기
+            {{ submitting ? '발송 중…' : '임시 비밀번호 받기' }}
           </Button>
 
           <div class="auth__alt">
@@ -101,10 +127,10 @@ function reset() {
           <div class="result__icon">
             <IconBase name="mail" :size="32" :stroke="1.5" />
           </div>
-          <h1 class="result__title">재설정 링크를 보냈어요</h1>
+          <h1 class="result__title">임시 비밀번호를 보냈어요</h1>
           <p class="result__sub">
-            <b>{{ maskEmail(email) }}</b>로 비밀번호 재설정 링크를 발송했어요.<br />
-            5분 이내에 이메일을 확인해 주세요.
+            <b>{{ sentEmail }}</b>로 임시 비밀번호를 발송했어요.<br />
+            로그인 후 비밀번호를 꼭 변경해 주세요.
           </p>
 
           <div class="result__notice">
@@ -273,6 +299,15 @@ function reset() {
 .auth__back:hover {
   color: var(--rekit-ink);
   background: var(--rekit-surface-muted);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fde7e7;
+  color: #c0392b;
+  border-radius: 10px;
+  font-size: 13px;
 }
 
 /* result */
