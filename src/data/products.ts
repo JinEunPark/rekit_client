@@ -16,7 +16,9 @@ export interface Product {
   warranty: boolean
   stock: number
   category: string
+  categoryId?: string
   tag?: string
+  thumbnailUrl?: string
 }
 
 export const PRODUCTS: Product[] = [

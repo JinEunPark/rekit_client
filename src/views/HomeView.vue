@@ -1,24 +1,32 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { PRODUCTS, type ApplianceKind } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import ApplianceGlyph from '@/components/ds/ApplianceGlyph.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
 import HomePromiseModal from '@/components/home/HomePromiseModal.vue'
+import { useHomeViewModel } from './HomeViewModel'
+import { useCategoryStore } from '@/stores/categories'
+import type { ApplianceKind } from '@/data/products'
 import type { IconName } from '@/design/icons'
 
-const categories: { id: string; label: string; kind: ApplianceKind | null; icon?: IconName }[] = [
-  { id: 'fridge', label: '냉장고', kind: 'fridge' },
-  { id: 'washer', label: '세탁기', kind: 'washer' },
-  { id: 'tv', label: 'TV', kind: 'tv' },
-  { id: 'aircon', label: '에어컨', kind: 'aircon' },
-  { id: 'kitchen', label: '주방가전', kind: 'microwave' },
-  { id: 'cleaner', label: '청소기', kind: 'vacuum' },
-  { id: 'small', label: '소형가전', kind: null, icon: 'box' },
-  { id: 'all', label: '전체', kind: null, icon: 'grid' },
-]
+const APPLIANCE_KINDS = new Set<ApplianceKind>([
+  'fridge',
+  'washer',
+  'tv',
+  'aircon',
+  'microwave',
+  'vacuum',
+])
 
-const featured = PRODUCTS.slice(0, 8)
+const vm = useHomeViewModel()
+const categoryStore = useCategoryStore()
+
+function applianceKind(icon: string): ApplianceKind | null {
+  return APPLIANCE_KINDS.has(icon as ApplianceKind) ? (icon as ApplianceKind) : null
+}
+
+onMounted(() => void vm.load())
 </script>
 
 <template>
@@ -35,14 +43,14 @@ const featured = PRODUCTS.slice(0, 8)
       <h2 class="section-h">카테고리</h2>
       <div class="cats__grid">
         <RouterLink
-          v-for="c in categories"
+          v-for="c in categoryStore.nav"
           :key="c.id"
-          :to="`/products?cat=${c.id}`"
+          :to="`/products?cat=${c.slug}`"
           class="cats__item"
         >
           <div class="cats__icon">
-            <ApplianceGlyph v-if="c.kind" :kind="c.kind" />
-            <IconBase v-else :name="c.icon!" :size="22" />
+            <ApplianceGlyph v-if="applianceKind(c.icon)" :kind="applianceKind(c.icon)!" />
+            <IconBase v-else :name="(c.icon as IconName)" :size="22" />
           </div>
           <span>{{ c.label }}</span>
         </RouterLink>
@@ -61,8 +69,18 @@ const featured = PRODUCTS.slice(0, 8)
           <IconBase name="chevronRight" :size="14" />
         </RouterLink>
       </div>
-      <div class="feat__grid">
-        <ProductCard v-for="p in featured" :key="p.id" :product="p" />
+      <div v-if="vm.loading.value && vm.featured.value.length === 0" class="feat__state">
+        상품을 불러오고 있어요…
+      </div>
+      <div v-else-if="vm.errorMessage.value" class="feat__state feat__state--error">
+        {{ vm.errorMessage.value }}
+        <button type="button" class="feat__retry" @click="vm.load()">다시 시도</button>
+      </div>
+      <div v-else-if="vm.featured.value.length === 0" class="feat__state">
+        아직 등록된 상품이 없어요.
+      </div>
+      <div v-else class="feat__grid">
+        <ProductCard v-for="p in vm.featured.value" :key="p.id" :product="p" />
       </div>
     </section>
 
@@ -226,6 +244,31 @@ const featured = PRODUCTS.slice(0, 8)
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
+}
+
+.feat__state {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--rekit-ink-muted);
+  background: var(--rekit-surface-muted);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.feat__state--error {
+  color: #c0392b;
+}
+.feat__retry {
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--rekit-surface);
+  border: 1px solid var(--rekit-border);
+  color: var(--rekit-ink);
 }
 
 @media (min-width: 640px) {

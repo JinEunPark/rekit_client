@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
 import {
-  CATEGORIES,
   DEFAULT_FILTERS,
   SORTS,
-  applyFilters,
-  useProductStore,
   type ProductFilters,
   type SortKey,
 } from '@/stores/products'
 import type { Grade } from '@/data/products'
+import { useListViewModel } from './ListViewModel'
+import { useCategoryStore } from '@/stores/categories'
 
 const route = useRoute()
 const router = useRouter()
-const store = useProductStore()
+const vm = useListViewModel()
+const categoryStore = useCategoryStore()
 
 /* ---------------------------------- */
 /* URL <-> filters                    */
@@ -82,14 +82,22 @@ function clearAll() {
 /* Derived                            */
 /* ---------------------------------- */
 
-const filtered = computed(() => applyFilters(store.all, filters.value))
-const activeCategory = computed(
-  () => CATEGORIES.find((c) => c.slug === filters.value.category) ?? CATEGORIES[0]!,
-)
+const filtered = computed(() => vm.items.value)
+const activeCategory = computed(() => {
+  const slug = filters.value.category
+  if (!slug || slug === 'all') return { slug: 'all', label: '전체' }
+  return categoryStore.bySlug(slug) ?? { slug: 'all', label: '전체' }
+})
 
 const hasNonCategoryFilters = computed(
   () => filters.value.grades.length > 0 || filters.value.warrantyOnly,
 )
+
+onMounted(() => {
+  void categoryStore.load()
+  void vm.load(filters.value)
+})
+watch(filters, (next) => void vm.load(next), { deep: true })
 </script>
 
 <template>
@@ -104,11 +112,19 @@ const hasNonCategoryFilters = computed(
       </div>
     </header>
 
-    <!-- Category chips -->
+    <!-- Category chips: 전체 + 백엔드 카테고리 -->
     <nav class="cats rekit-no-scrollbar" aria-label="카테고리">
       <button
-        v-for="c in CATEGORIES"
-        :key="c.slug"
+        type="button"
+        class="cats__chip"
+        :class="{ 'cats__chip--active': filters.category === 'all' }"
+        @click="setCategory('all')"
+      >
+        전체
+      </button>
+      <button
+        v-for="c in categoryStore.items"
+        :key="c.id"
         type="button"
         class="cats__chip"
         :class="{ 'cats__chip--active': c.slug === filters.category }"
@@ -174,11 +190,18 @@ const hasNonCategoryFilters = computed(
       </button>
     </div>
 
-    <!-- Grid or empty -->
-    <div v-if="filtered.length > 0" class="grid">
+    <!-- Loading / error / grid / empty -->
+    <div v-if="vm.loading.value && filtered.length === 0" class="empty">
+      <p>상품을 불러오는 중…</p>
+    </div>
+    <div v-else-if="vm.errorMessage.value && filtered.length === 0" class="empty">
+      <div class="empty__t">상품을 불러오지 못했어요</div>
+      <p class="empty__b">{{ vm.errorMessage.value }}</p>
+      <button type="button" class="empty__btn" @click="vm.load(filters)">다시 시도</button>
+    </div>
+    <div v-else-if="filtered.length > 0" class="grid">
       <ProductCard v-for="p in filtered" :key="p.id" :product="p" />
     </div>
-
     <div v-else class="empty">
       <div class="empty__icon">
         <IconBase name="search" :size="32" :stroke="1.4" />

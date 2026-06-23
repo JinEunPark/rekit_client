@@ -32,6 +32,7 @@ function toggleLike() {
         :kind="product.kind"
         :tone="product.tone"
         :grade="product.grade"
+        :image-url="product.thumbnailUrl"
         ratio="1/1"
       />
       <button
@@ -47,7 +48,9 @@ function toggleLike() {
       <div v-if="product.tag" class="card__tag">{{ product.tag }}</div>
     </div>
     <div class="card__body">
-      <div class="card__brand">{{ product.brand }} · {{ product.year }}</div>
+      <div class="card__brand">
+        {{ product.brand }}<template v-if="product.year"> · {{ product.year }}</template>
+      </div>
       <div class="card__title">{{ product.title }}</div>
       <div class="card__price">
         <span class="card__pct">{{ discountPct(product) }}%</span>

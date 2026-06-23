@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { REKIT } from '@/design/tokens'
 import type { ApplianceKind, Tone, Grade } from '@/data/products'
 import ApplianceGlyph from './ApplianceGlyph.vue'
@@ -14,6 +14,7 @@ const props = withDefaults(
     tone?: Tone
     radius?: string
     showLabel?: boolean
+    imageUrl?: string
   }>(),
   { ratio: '1/1', tone: 'mint', radius: REKIT.radius.lg, showLabel: true },
 )
@@ -40,11 +41,29 @@ const tileStyle = computed(() => {
 const gradeTone = computed(
   () => (props.grade ? (props.grade.toLowerCase() as 'a' | 'b' | 'c') : undefined),
 )
+
+// 이미지 로드 실패 시 placeholder 로 폴백.
+const imageFailed = ref(false)
+watch(
+  () => props.imageUrl,
+  () => {
+    imageFailed.value = false
+  },
+)
+const showImage = computed(() => !!props.imageUrl && !imageFailed.value)
 </script>
 
 <template>
   <div class="rekit-tile" :style="tileStyle">
-    <div class="rekit-tile__glyph">
+    <img
+      v-if="showImage"
+      :src="imageUrl"
+      :alt="label ?? ''"
+      class="rekit-tile__img"
+      loading="lazy"
+      @error="imageFailed = true"
+    />
+    <div v-else class="rekit-tile__glyph">
       <ApplianceGlyph :kind="kind" />
     </div>
     <div v-if="grade" class="rekit-tile__grade">
@@ -63,6 +82,14 @@ const gradeTone = computed(
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.rekit-tile__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .rekit-tile__glyph {
   width: 62%;

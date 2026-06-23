@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import { discountPct, type Tone } from '@/data/products'
@@ -8,20 +8,22 @@ import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
-import { useProductStore, CATEGORIES } from '@/stores/products'
 import { useCartStore } from '@/stores/cart'
 import { useWishlistStore } from '@/stores/wishlist'
+import { useCategoryStore } from '@/stores/categories'
+import { useDetailViewModel } from './DetailViewModel'
 
 const route = useRoute()
 const router = useRouter()
-const store = useProductStore()
 const cart = useCartStore()
 const wishlist = useWishlistStore()
+const categoryStore = useCategoryStore()
+const vm = useDetailViewModel()
 
 const productId = computed(() => route.params.id as string)
-const product = computed(() => store.findById(productId.value))
+const product = computed(() => vm.product.value)
 
-const thumbs: { l: string; t: Tone }[] = [
+const PLACEHOLDER_THUMBS: { l: string; t: Tone }[] = [
   { l: '정면', t: 'mint' },
   { l: '측면', t: 'sage' },
   { l: '내부', t: 'cool' },
@@ -29,6 +31,24 @@ const thumbs: { l: string; t: Tone }[] = [
   { l: '뒷면', t: 'stone' },
   { l: '제품번호', t: 'cream' },
 ]
+
+const TONE_CYCLE: Tone[] = ['mint', 'sage', 'cool', 'sand', 'stone', 'cream']
+
+interface Thumb {
+  l: string
+  t: Tone
+  url?: string
+}
+
+const thumbs = computed<Thumb[]>(() => {
+  const images = vm.images.value
+  if (images.length === 0) return PLACEHOLDER_THUMBS
+  return images.map((img, i) => ({
+    l: img.label ?? `사진 ${i + 1}`,
+    t: TONE_CYCLE[i % TONE_CYCLE.length] as Tone,
+    url: img.url,
+  }))
+})
 
 const grades = [
   { g: 'A', t: '거의 새 것 같은 상태, 사용감 미미' },
@@ -45,14 +65,18 @@ function toggleLike() {
   if (product.value) wishlist.toggle(product.value.id)
 }
 
-watch(productId, () => {
+onMounted(() => void vm.load(productId.value))
+watch(productId, (next) => {
   selectedThumb.value = 0
   qty.value = 1
+  void vm.load(next)
 })
 
 const breadcrumb = computed(() => {
   if (!product.value) return []
-  const cat = CATEGORIES.find((c) => c.kinds?.includes(product.value!.kind))
+  const cat = product.value.categoryId
+    ? categoryStore.items.find((c) => c.id === product.value!.categoryId)
+    : undefined
   return [
     { to: '/', label: '홈' },
     { to: cat ? `/products?cat=${cat.slug}` : '/products', label: cat?.label ?? '전체' },
@@ -73,12 +97,7 @@ const specs = computed(() => {
   ] as [string, string][]
 })
 
-const related = computed(() => {
-  if (!product.value) return []
-  return store.all
-    .filter((p) => p.kind === product.value!.kind && p.id !== product.value!.id)
-    .slice(0, 4)
-})
+const related = computed(() => vm.related.value)
 
 function dec() {
   if (qty.value > 1) qty.value -= 1
@@ -118,13 +137,23 @@ const gradeShort = computed(() => {
 </script>
 
 <template>
-  <div v-if="!product" class="missing">
+  <div v-if="vm.loading.value && !product" class="missing">
+    <p>상품을 불러오는 중…</p>
+  </div>
+
+  <div v-else-if="vm.notFound.value || (!vm.loading.value && !product && !vm.errorMessage.value)" class="missing">
     <h1>상품을 찾을 수 없어요</h1>
     <p>이미 판매가 종료됐거나 잘못된 주소일 수 있어요.</p>
     <RouterLink to="/products" class="missing__btn">상품 목록 보기</RouterLink>
   </div>
 
-  <div v-else class="detail">
+  <div v-else-if="vm.errorMessage.value && !product" class="missing">
+    <h1>상품을 불러오지 못했어요</h1>
+    <p>{{ vm.errorMessage.value }}</p>
+    <button type="button" class="missing__btn" @click="vm.load(productId)">다시 시도</button>
+  </div>
+
+  <div v-else-if="product" class="detail">
     <!-- Breadcrumb -->
     <nav class="crumb" aria-label="경로">
       <template v-for="(b, i) in breadcrumb" :key="i">
@@ -142,6 +171,7 @@ const gradeShort = computed(() => {
           <ProductTile
             :kind="product.kind"
             :tone="thumbs[selectedThumb]!.t"
+            :image-url="thumbs[selectedThumb]?.url"
             ratio="1/1"
             radius="20px"
             :show-label="false"
@@ -162,6 +192,7 @@ const gradeShort = computed(() => {
             <ProductTile
               :kind="product.kind"
               :tone="th.t"
+              :image-url="th.url"
               ratio="1/1"
               radius="10px"
               :show-label="false"
