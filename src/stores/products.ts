@@ -98,5 +98,16 @@ export const useProductStore = defineStore('products', () => {
     return all.value.find((p) => p.id === id)
   }
 
-  return { all, totalCount, findById }
+  function upsert(newItems: Product[]) {
+    for (const p of newItems) {
+      const idx = all.value.findIndex((x) => x.id === p.id)
+      if (idx >= 0) {
+        all.value[idx] = p
+      } else {
+        all.value.push(p)
+      }
+    }
+  }
+
+  return { all, totalCount, findById, upsert }
 })

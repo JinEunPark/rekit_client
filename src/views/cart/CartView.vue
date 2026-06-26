@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
@@ -7,29 +7,37 @@ import Button from '@/components/ds/Button.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
-import { useProductStore } from '@/stores/products'
+import type { Product } from '@/data/products'
 
 const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
-const products = useProductStore()
-
-/** Default 직접배송 (서울/경기) — to be selectable in checkout. */
-const SHIPPING_FEE = 40_000
 
 interface Line {
   productId: string
   qty: number
   selected: boolean
-  product: ReturnType<typeof products.findById>
+  product: Product | undefined
 }
+
+const productMap = ref<Record<string, Product>>({})
+
+// productIds가 바뀔 때마다(로그인 동기화 포함) 상품 정보 재조회
+watch(
+  () => cart.items.map((i) => i.productId).join(','),
+  async () => { productMap.value = await cart.loadProducts() },
+  { immediate: true },
+)
+
+/** Default 직접배송 (서울/경기) — to be selectable in checkout. */
+const SHIPPING_FEE = 40_000
 
 const lines = computed<Line[]>(() =>
   cart.items.map((i) => ({
     productId: i.productId,
     qty: i.qty,
     selected: i.selected,
-    product: products.findById(i.productId),
+    product: productMap.value[i.productId],
   })),
 )
 
@@ -51,10 +59,10 @@ function toggleAll() {
   cart.setAllSelected(!allSelected.value)
 }
 
-function removeSelected() {
+async function removeSelected() {
   if (selectedLines.value.length === 0) return
   if (!window.confirm(`선택한 ${selectedLines.value.length}건을 삭제할까요?`)) return
-  selectedLines.value.forEach((l) => cart.remove(l.productId))
+  await cart.removeAllSelected()
 }
 
 function dec(line: Line) {
