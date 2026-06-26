@@ -148,10 +148,10 @@ function deleteAccount() {
       <h2 class="block__title">보안</h2>
       <ul class="actions">
         <li>
-          <button type="button" class="action">
+          <RouterLink to="/my/password" class="action">
             <span>비밀번호 변경</span>
             <IconBase name="chevronRight" :size="14" />
-          </button>
+          </RouterLink>
         </li>
         <li>
           <button type="button" class="action">

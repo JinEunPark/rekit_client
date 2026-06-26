@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sv \"http://localhost:8000/openapi.json\")",
+      "Bash(grep -oE \"'/[a-z/-]+\\(\\\\\\\\\\\\$\\\\\\\\{[a-z]+\\\\\\\\}\\)?[a-z/-]*'\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(sum\\(1 for p,ms in d['paths'].items\\(\\) for m in ms if m in \\('get','post','patch','delete','put'\\) and p != '/health'\\)\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/users/me/password -H 'Content-Type: application/json' -H 'Authorization: Bearer fake' -d '{\"currentPassword\":\"x\",\"newPassword\":\"x\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/email/send-verification -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -d '{\"email\":\"test@example.com\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/email/verify-code -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -d '{\"email\":\"test@example.com\",\"code\":\"000000\"}' -w '\\\\nHTTP %{http_code}\\\\n')"
+    ]
+  }
+}

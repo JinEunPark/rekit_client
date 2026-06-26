@@ -42,8 +42,8 @@ async function submit(e: Event) {
     auth.setSession(result.accessToken, { loginId: loginId.value.trim() })
     void auth.fetchMe()
     if (result.mustChangePassword) {
-      // TODO(profile): 비밀번호 변경 강제 화면 (find-password 임시 비번 사용 후 진입)
-      console.warn('mustChangePassword: 사용자에게 비밀번호 변경을 요청해야 합니다.')
+      router.replace('/my/password?required=1')
+      return
     }
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.replace(redirect)

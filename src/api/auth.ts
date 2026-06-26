@@ -24,21 +24,39 @@ export interface SignInPayload {
 }
 
 export interface SignUpPayload {
+  verifiedToken: string
   loginId: string
   username: string
   password: string
-  email: string
   agreedTerms: boolean
   agreedPrivacy: boolean
   agreedMarketing: boolean
+}
+
+export interface VerifyCodeResponse {
+  verifiedToken: string
 }
 
 export function signIn(payload: SignInPayload): Promise<TokenResponse> {
   return apiRequest<TokenResponse>('/auth/sign-in', { method: 'POST', body: payload })
 }
 
-export function signUp(payload: SignUpPayload): Promise<UserResponse> {
-  return apiRequest<UserResponse>('/auth/sign-up', { method: 'POST', body: payload })
+export function signUp(payload: SignUpPayload): Promise<TokenResponse> {
+  return apiRequest<TokenResponse>('/auth/sign-up', { method: 'POST', body: payload })
+}
+
+export function sendEmailVerification(email: string): Promise<void> {
+  return apiRequest<void>('/auth/email/send-verification', {
+    method: 'POST',
+    body: { email },
+  })
+}
+
+export function verifyEmailCode(email: string, code: string): Promise<VerifyCodeResponse> {
+  return apiRequest<VerifyCodeResponse>('/auth/email/verify-code', {
+    method: 'POST',
+    body: { email, code },
+  })
 }
 
 export interface AvailabilityResponse {

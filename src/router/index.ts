@@ -22,6 +22,7 @@ const router = createRouter({
     { path: '/my/wishlist', name: 'my-wishlist', component: () => import('../views/my/WishlistView.vue') },
     { path: '/my/addresses', name: 'my-addresses', component: () => import('../views/my/AddressesView.vue') },
     { path: '/my/profile', name: 'my-profile', component: () => import('../views/my/ProfileView.vue') },
+    { path: '/my/password', name: 'my-password', component: () => import('../views/my/ChangePasswordView.vue') },
 
     // Products
     { path: '/products', name: 'products', component: () => import('../views/products/ListView.vue') },

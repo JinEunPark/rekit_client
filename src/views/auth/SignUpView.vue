@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import Button from '@/components/ds/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 import { buildAuthorizeUrl, type OAuthProvider } from '@/config/oauth'
-import { checkLoginId as apiCheckLoginId, signIn as apiSignIn, signUp as apiSignUp } from '@/api/auth'
+import {
+  checkLoginId as apiCheckLoginId,
+  sendEmailVerification,
+  signUp as apiSignUp,
+  verifyEmailCode,
+} from '@/api/auth'
 import { ApiError } from '@/api/client'
 
 const router = useRouter()
@@ -40,6 +45,98 @@ const passwordsMatch = computed(
   () => passwordConfirm.value.length > 0 && passwordConfirm.value === password.value,
 )
 const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
+
+// 이메일 인증 state machine
+type VerifyStatus = 'idle' | 'sending' | 'sent' | 'verifying' | 'verified'
+const verifyStatus = ref<VerifyStatus>('idle')
+const verifyCode = ref('')
+const verifyCodeFocused = ref(false)
+const verifiedToken = ref('')
+const verifyError = ref('')
+
+// 재발송 쿨다운 (초)
+const cooldown = ref(0)
+let cooldownTimer: number | null = null
+
+function startCooldown(seconds: number) {
+  cooldown.value = seconds
+  if (cooldownTimer !== null) window.clearInterval(cooldownTimer)
+  cooldownTimer = window.setInterval(() => {
+    cooldown.value -= 1
+    if (cooldown.value <= 0) {
+      cooldown.value = 0
+      if (cooldownTimer !== null) {
+        window.clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }
+  }, 1000)
+}
+
+onUnmounted(() => {
+  if (cooldownTimer !== null) window.clearInterval(cooldownTimer)
+})
+
+// 이메일이 바뀌면 이전 인증은 무효 — verifiedToken 은 이메일에 묶임
+watch(email, () => {
+  if (verifyStatus.value === 'verified' || verifyStatus.value === 'sent') {
+    verifyStatus.value = 'idle'
+    verifyCode.value = ''
+    verifiedToken.value = ''
+    verifyError.value = ''
+  }
+})
+
+async function sendCode() {
+  if (!emailValid.value || verifyStatus.value === 'sending' || cooldown.value > 0) return
+  verifyError.value = ''
+  verifyStatus.value = 'sending'
+  try {
+    await sendEmailVerification(email.value.trim())
+    verifyStatus.value = 'sent'
+    startCooldown(60)
+  } catch (err) {
+    verifyStatus.value = 'idle'
+    if (err instanceof ApiError) {
+      if (err.code === 'VERIFICATION_RATE_LIMITED') {
+        verifyStatus.value = 'sent'
+        startCooldown(60)
+        verifyError.value = '잠시 후 다시 시도해 주세요.'
+      } else {
+        verifyError.value = `${err.message} (${err.code})`
+      }
+    } else {
+      verifyError.value = err instanceof Error ? err.message : '인증 메일 발송에 실패했어요.'
+    }
+  }
+}
+
+async function confirmCode() {
+  if (verifyCode.value.length !== 6 || verifyStatus.value === 'verifying') return
+  verifyError.value = ''
+  verifyStatus.value = 'verifying'
+  try {
+    const result = await verifyEmailCode(email.value.trim(), verifyCode.value)
+    verifiedToken.value = result.verifiedToken
+    verifyStatus.value = 'verified'
+  } catch (err) {
+    verifyStatus.value = 'sent'
+    if (err instanceof ApiError && err.code === 'INVALID_VERIFICATION_CODE') {
+      verifyError.value = '인증 코드가 일치하지 않거나 만료됐어요.'
+    } else if (err instanceof ApiError) {
+      verifyError.value = `${err.message} (${err.code})`
+    } else {
+      verifyError.value = err instanceof Error ? err.message : '코드 확인에 실패했어요.'
+    }
+  }
+}
+
+function resetVerification() {
+  verifyStatus.value = 'idle'
+  verifyCode.value = ''
+  verifiedToken.value = ''
+  verifyError.value = ''
+}
 
 const agreeTerms = ref(false)
 const agreePrivacy = ref(false)
@@ -77,7 +174,7 @@ const canSubmit = computed(
     usernameValid.value &&
     passwordValid.value &&
     passwordsMatch.value &&
-    emailValid.value &&
+    verifyStatus.value === 'verified' &&
     requiredAgreed.value,
 )
 
@@ -91,20 +188,14 @@ async function submit(e: Event) {
   errorMessage.value = ''
   try {
     const trimmedLoginId = loginId.value.trim()
-    await apiSignUp({
+    const tokens = await apiSignUp({
+      verifiedToken: verifiedToken.value,
       loginId: trimmedLoginId,
       username: username.value.trim(),
       password: password.value,
-      email: email.value.trim(),
       agreedTerms: agreeTerms.value,
       agreedPrivacy: agreePrivacy.value,
       agreedMarketing: agreeMarketing.value,
-    })
-    // 백엔드 sign-up 은 token 을 반환하지 않음 → 동일 자격증명으로 즉시 로그인.
-    const tokens = await apiSignIn({
-      loginId: trimmedLoginId,
-      password: password.value,
-      remember: true,
     })
     auth.setSession(tokens.accessToken, {
       loginId: trimmedLoginId,
@@ -116,11 +207,15 @@ async function submit(e: Event) {
     router.replace(redirect)
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.code === 'USERNAME_TAKEN' || err.code === 'LOGIN_ID_TAKEN') {
+      if (err.code === 'TOKEN_EXPIRED') {
+        errorMessage.value = '인증 정보가 만료됐어요. 이메일 인증부터 다시 진행해 주세요.'
+        resetVerification()
+      } else if (err.code === 'USERNAME_TAKEN' || err.code === 'LOGIN_ID_TAKEN') {
         errorMessage.value = '이미 사용 중인 아이디예요.'
         loginIdCheck.value = 'taken'
       } else if (err.code === 'EMAIL_TAKEN') {
         errorMessage.value = '이미 가입된 이메일이에요.'
+        resetVerification()
       } else {
         errorMessage.value = `${err.message} (${err.code})`
       }
@@ -273,7 +368,7 @@ function startSocialLogin(provider: OAuthProvider) {
           </span>
         </label>
 
-        <!-- Email -->
+        <!-- Email + verification -->
         <label class="field" :class="{ 'field--focus': emailFocused }">
           <span class="field__label">이메일</span>
           <div class="field__row">
@@ -282,11 +377,68 @@ function startSocialLogin(provider: OAuthProvider) {
               type="email"
               autocomplete="email"
               placeholder="비밀번호 찾기 등 본인 확인용"
+              :disabled="verifyStatus === 'sent' || verifyStatus === 'verifying' || verifyStatus === 'verified'"
               @focus="emailFocused = true"
               @blur="emailFocused = false"
             />
+            <button
+              v-if="verifyStatus !== 'verified'"
+              type="button"
+              class="field__action"
+              :disabled="!emailValid || verifyStatus === 'sending' || (verifyStatus === 'sent' && cooldown > 0) || verifyStatus === 'verifying'"
+              @click="sendCode"
+            >
+              <template v-if="verifyStatus === 'sending'">발송 중</template>
+              <template v-else-if="verifyStatus === 'sent' && cooldown > 0">{{ cooldown }}초</template>
+              <template v-else-if="verifyStatus === 'sent' || verifyStatus === 'verifying'">재발송</template>
+              <template v-else>인증코드 받기</template>
+            </button>
+            <span v-else class="field__verified">
+              <IconBase name="check" :size="14" :stroke="2.5" /> 인증 완료
+            </span>
           </div>
         </label>
+
+        <!-- Verification code -->
+        <label
+          v-if="verifyStatus === 'sent' || verifyStatus === 'verifying'"
+          class="field"
+          :class="{ 'field--focus': verifyCodeFocused }"
+        >
+          <span class="field__label">인증 코드</span>
+          <div class="field__row">
+            <input
+              v-model="verifyCode"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              placeholder="이메일로 받은 6자리 숫자"
+              @focus="verifyCodeFocused = true"
+              @blur="verifyCodeFocused = false"
+            />
+            <button
+              type="button"
+              class="field__action"
+              :disabled="verifyCode.length !== 6 || verifyStatus === 'verifying'"
+              @click="confirmCode"
+            >
+              {{ verifyStatus === 'verifying' ? '확인 중' : '확인' }}
+            </button>
+          </div>
+          <span v-if="verifyError" class="field__hint field__hint--err">
+            <IconBase name="warning" :size="12" /> {{ verifyError }}
+          </span>
+          <span v-else class="field__hint field__hint--muted">
+            메일이 도착하지 않았다면 스팸함을 확인해 주세요. 코드는 10분간 유효합니다.
+          </span>
+        </label>
+        <span
+          v-else-if="verifyError"
+          class="field__hint field__hint--err"
+        >
+          <IconBase name="warning" :size="12" /> {{ verifyError }}
+        </span>
 
         <!-- Agreements -->
         <fieldset class="agree">
@@ -534,6 +686,21 @@ function startSocialLogin(provider: OAuthProvider) {
 }
 .field__action--ghost:hover {
   color: var(--rekit-ink);
+}
+.field__verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rekit-accent-deep);
+  align-self: center;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.field__row input:disabled {
+  color: var(--rekit-ink-muted);
+  cursor: not-allowed;
 }
 .field__hint {
   display: inline-flex;
