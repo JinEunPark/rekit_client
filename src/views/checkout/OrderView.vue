@@ -10,6 +10,7 @@ import CheckoutSteps from '@/components/checkout/CheckoutSteps.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useProductStore } from '@/stores/products'
+import type { Product } from '@/data/products'
 import {
   useOrderStore,
   type DeliveryMethod,
@@ -28,10 +29,11 @@ const addresses = useAddressStore()
 interface Snapshot {
   productId: string
   qty: number
-  product: ReturnType<typeof productStore.findById>
+  product: Product
 }
 
 const snapshot = ref<Snapshot[]>([])
+const snapshotLoading = ref(false)
 
 onBeforeMount(() => {
   if (!auth.user) {
@@ -47,14 +49,17 @@ onBeforeMount(() => {
     router.replace('/cart')
     return
   }
-  // Snapshot the selected items so cart edits during checkout don't change the order
-  snapshot.value = selected
-    .map((i) => ({
-      productId: i.productId,
-      qty: i.qty,
-      product: productStore.findById(i.productId),
-    }))
-    .filter((s) => s.product)
+  snapshotLoading.value = true
+  void (async () => {
+    try {
+      const productMap = await productStore.fetchByIds(selected.map((i) => i.productId))
+      snapshot.value = selected.flatMap((i) =>
+        productMap[i.productId] ? [{ productId: i.productId, qty: i.qty, product: productMap[i.productId]! }] : []
+      )
+    } finally {
+      snapshotLoading.value = false
+    }
+  })()
 })
 
 /* ────────────── Address ────────────── */
@@ -154,7 +159,8 @@ function pay() {
 </script>
 
 <template>
-  <div v-if="snapshot.length > 0" class="page">
+  <div v-if="snapshotLoading" class="loading">상품 정보를 불러오는 중…</div>
+  <div v-else-if="snapshot.length > 0" class="page">
     <CheckoutSteps :current="2" />
 
     <!-- Verified badge -->
@@ -640,5 +646,12 @@ function pay() {
   .sticky-cta {
     display: none;
   }
+}
+
+.loading {
+  padding: 80px 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--rekit-ink-muted);
 }
 </style>

@@ -3,12 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
-import { applyFilters, DEFAULT_FILTERS, useProductStore, CATEGORIES } from '@/stores/products'
+import { CATEGORIES } from '@/stores/products'
 import { POPULAR_KEYWORDS, useSearchHistory } from '@/composables/useSearchHistory'
+import { listProducts } from '@/api/catalog'
+import { toProduct } from '@/views/products/mappers'
+import { useCategoryStore } from '@/stores/categories'
+import type { Product } from '@/data/products'
 
 const route = useRoute()
 const router = useRouter()
-const products = useProductStore()
+const categoryStore = useCategoryStore()
 const { recents, add: addRecent, remove: removeRecent, clearAll: clearRecents } = useSearchHistory()
 
 function asString(v: unknown): string {
@@ -17,6 +21,9 @@ function asString(v: unknown): string {
 }
 
 const q = ref(asString(route.query.q))
+const results = ref<Product[]>([])
+const searchLoading = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
   () => route.query.q,
@@ -25,6 +32,24 @@ watch(
     if (next !== q.value) q.value = next
   },
 )
+
+async function doSearch(query: string) {
+  searchLoading.value = true
+  try {
+    const [res] = await Promise.all([listProducts({ q: query, size: 20 }), categoryStore.load()])
+    results.value = res.items.map(toProduct)
+  } catch {
+    results.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+watch(q, (val) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  if (!val.trim()) { results.value = []; return }
+  searchTimer = setTimeout(() => void doSearch(val.trim()), 300)
+}, { immediate: true })
 
 function submit() {
   const t = q.value.trim()
@@ -45,9 +70,6 @@ function clearQuery() {
 }
 
 const showResults = computed(() => q.value.trim().length > 0)
-const results = computed(() =>
-  showResults.value ? applyFilters(products.all, { ...DEFAULT_FILTERS, q: q.value }) : [],
-)
 
 /* Categories shown when no query, excluding "all" */
 const browseCats = CATEGORIES.filter((c) => c.slug !== 'all')
@@ -149,10 +171,13 @@ const browseCats = CATEGORIES.filter((c) => c.slug !== 'all')
       <template v-else>
         <div class="meta">
           <span><b>"{{ q }}"</b> 검색 결과</span>
-          <span class="meta__count">{{ results.length }}개</span>
+          <span class="meta__count">{{ searchLoading ? '…' : `${results.length}개` }}</span>
         </div>
 
-        <div v-if="results.length > 0" class="grid">
+        <div v-if="searchLoading && results.length === 0" class="empty">
+          <p style="color: var(--rekit-ink-muted); font-size: 13px;">검색 중…</p>
+        </div>
+        <div v-else-if="results.length > 0" class="grid">
           <ProductCard v-for="p in results" :key="p.id" :product="p" />
         </div>
 

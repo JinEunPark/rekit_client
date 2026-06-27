@@ -1,6 +1,9 @@
-import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { PRODUCTS, discountPct, type ApplianceKind, type Grade, type Product } from '@/data/products'
+import { discountPct, type ApplianceKind, type Grade, type Product } from '@/data/products'
+import { getProduct, getProductsBulk } from '@/api/catalog'
+import { toDetailProduct, toProduct } from '@/views/products/mappers'
+import { useCategoryStore } from '@/stores/categories'
+import { toNumId } from './utils'
 
 export type SortKey = 'newest' | 'price-asc' | 'price-desc' | 'discount'
 
@@ -91,23 +94,29 @@ export function applyFilters(items: Product[], f: ProductFilters): Product[] {
 }
 
 export const useProductStore = defineStore('products', () => {
-  const all = ref<Product[]>(PRODUCTS)
-  const totalCount = computed(() => all.value.length)
+  const categoryStore = useCategoryStore()
 
-  function findById(id: string): Product | undefined {
-    return all.value.find((p) => p.id === id)
-  }
-
-  function upsert(newItems: Product[]) {
-    for (const p of newItems) {
-      const idx = all.value.findIndex((x) => x.id === p.id)
-      if (idx >= 0) {
-        all.value[idx] = p
-      } else {
-        all.value.push(p)
-      }
+  async function fetchById(id: string): Promise<Product | undefined> {
+    const n = parseInt(id, 10)
+    if (!Number.isFinite(n)) return undefined
+    try {
+      const [detail] = await Promise.all([getProduct(n), categoryStore.load()])
+      return toDetailProduct(detail)
+    } catch {
+      return undefined
     }
   }
 
-  return { all, totalCount, findById, upsert }
+  async function fetchByIds(ids: string[]): Promise<Record<string, Product>> {
+    const numIds = ids.map(toNumId).filter((n): n is number => n !== null)
+    if (!numIds.length) return {}
+    try {
+      const [items] = await Promise.all([getProductsBulk(numIds), categoryStore.load()])
+      return Object.fromEntries(items.map((p) => [String(p.id), toProduct(p)]))
+    } catch {
+      return {}
+    }
+  }
+
+  return { fetchById, fetchByIds }
 })

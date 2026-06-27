@@ -4,23 +4,37 @@ import { useRoute, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import { won } from '@/design/tokens'
-import { applyFilters, DEFAULT_FILTERS, useProductStore } from '@/stores/products'
 import { POPULAR_KEYWORDS, useSearchHistory } from '@/composables/useSearchHistory'
+import { listProducts } from '@/api/catalog'
+import { toProduct } from '@/views/products/mappers'
+import { useCategoryStore } from '@/stores/categories'
+import type { Product } from '@/data/products'
 
 const router = useRouter()
 const route = useRoute()
-const products = useProductStore()
+const categoryStore = useCategoryStore()
 const { recents, add, remove, clearAll } = useSearchHistory()
 
 const q = ref('')
 const open = ref(false)
 const wrapperEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLInputElement | null>(null)
+const results = ref<Product[]>([])
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const showResults = computed(() => q.value.trim().length > 0)
-const results = computed(() => {
-  if (!showResults.value) return []
-  return applyFilters(products.all, { ...DEFAULT_FILTERS, q: q.value }).slice(0, 5)
+
+watch(q, (val) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  if (!val.trim()) { results.value = []; return }
+  searchTimer = setTimeout(async () => {
+    try {
+      const [res] = await Promise.all([listProducts({ q: val.trim(), size: 5 }), categoryStore.load()])
+      results.value = res.items.map(toProduct)
+    } catch {
+      results.value = []
+    }
+  }, 200)
 })
 
 function focus() {

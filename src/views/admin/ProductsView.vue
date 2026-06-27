@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useProductStore } from '@/stores/products'
-import { discountPct } from '@/data/products'
+import { discountPct, PRODUCTS } from '@/data/products'
 import { won } from '@/design/tokens'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
@@ -10,12 +9,11 @@ import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 
-const products = useProductStore()
 const search = ref('')
 const filter = ref<'all' | 'sale' | 'soldout' | 'private'>('all')
 
 const filtered = computed(() => {
-  let list = products.all
+  let list = PRODUCTS
   const q = search.value.trim().toLowerCase()
   if (q) {
     list = list.filter(
@@ -31,9 +29,9 @@ const filtered = computed(() => {
 })
 
 const counts = computed(() => ({
-  all: products.all.length,
-  sale: products.all.filter((p) => p.stock > 0).length,
-  soldout: products.all.filter((p) => p.stock === 0).length,
+  all: PRODUCTS.length,
+  sale: PRODUCTS.filter((p) => p.stock > 0).length,
+  soldout: PRODUCTS.filter((p) => p.stock === 0).length,
   private: 0,
 }))
 

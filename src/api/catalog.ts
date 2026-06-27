@@ -10,7 +10,7 @@ export type BackendCategory =
   | 'ETC'
 
 export type BackendGrade = 'A' | 'B' | 'C'
-export type ProductStatus = 'ACTIVE' | 'SOLD' | 'INACTIVE'
+export type ProductStatus = 'ACTIVE' | 'SOLD_OUT' | 'INACTIVE'
 export type ProductSort = 'latest' | 'price_asc' | 'price_desc'
 
 // catalog 라우터는 response_model_by_alias 미사용 — 응답은 snake_case 그대로.
@@ -106,6 +106,20 @@ export function listProducts(params: ProductListParams = {}): Promise<ProductLis
   return apiRequest<ProductListResponse>(`/products${toQuery(params)}`, { method: 'GET' })
 }
 
+export function getProductsBulk(ids: number[]): Promise<ProductResponse[]> {
+  return apiRequest<ProductResponse[]>('/products/bulk', { method: 'POST', body: { ids } })
+}
+
 export function getCategories(): Promise<CategoryMetaItem[]> {
   return apiRequest<CategoryMetaItem[]>('/categories', { method: 'GET' })
+}
+
+export interface PopularKeyword {
+  rank: number
+  keyword: string
+  trend: 'up' | 'down' | 'same'
+}
+
+export function getPopularKeywords(limit = 8): Promise<PopularKeyword[]> {
+  return apiRequest<PopularKeyword[]>(`/products/popular-keywords?limit=${limit}`, { method: 'GET' })
 }

@@ -1,18 +1,34 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
 import { useWishlistStore } from '@/stores/wishlist'
 import { useProductStore } from '@/stores/products'
+import type { Product } from '@/data/products'
 
 const wishlist = useWishlistStore()
-const products = useProductStore()
+const productStore = useProductStore()
+
+const productMap = ref<Record<string, Product>>({})
+
+// ids가 바뀔 때마다 (초기 로드 + 로그인 후 서버 동기화 포함) 새로 fetch
+watch(
+  () => wishlist.ids,
+  async (ids) => {
+    const idSet = new Set(ids)
+    Object.keys(productMap.value).forEach((k) => { if (!idSet.has(k)) delete productMap.value[k] })
+    const missing = ids.filter((id) => !productMap.value[id])
+    if (!missing.length) return
+    Object.assign(productMap.value, await productStore.fetchByIds(missing))
+  },
+  { immediate: true },
+)
 
 const items = computed(() =>
   wishlist.ids
-    .map((id) => products.findById(id))
-    .filter((p): p is NonNullable<typeof p> => !!p),
+    .map((id) => productMap.value[id])
+    .filter((p): p is Product => !!p),
 )
 </script>
 

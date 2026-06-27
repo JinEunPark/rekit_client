@@ -18,6 +18,7 @@
   --rekit-danger: #D24E4E;
   --rekit-font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
   --rekit-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --rekit-tab-bar-height: 54px;
 }
 
 *,

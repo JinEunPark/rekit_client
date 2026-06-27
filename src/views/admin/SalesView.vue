@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { useProductStore } from '@/stores/products'
+import { PRODUCTS } from '@/data/products'
 import { won } from '@/design/tokens'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
-
-const products = useProductStore()
 
 const headlineKpis = [
   { l: '주문 건수', v: '94', s: '건' },
@@ -23,7 +21,7 @@ const payments = [
 ]
 
 const dates = ['04.01', '04.06', '04.11', '04.16', '04.21', '04.26', '04.30']
-const top = products.all.slice(0, 5)
+const top = PRODUCTS.slice(0, 5)
 const dummyCount = [4, 6, 5, 7, 3]
 const linePoints: [number, number][] = [
   [0, 130], [100, 120], [200, 100], [300, 80], [400, 65], [500, 55], [600, 45],

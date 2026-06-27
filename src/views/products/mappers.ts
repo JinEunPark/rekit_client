@@ -41,7 +41,7 @@ export function toProduct(p: ProductResponse): Product {
     price: p.price,
     original: p.original_price ?? p.price,
     warranty: p.warranty_works,
-    stock: 1,
+    stock: p.status === 'SOLD_OUT' ? 0 : 1,
     category: cat?.label ?? '',
     categoryId: p.category,
     tag: p.warranty_works ? '동작보증' : undefined,

@@ -11,9 +11,9 @@ import {
   syncCart,
   type CartResponse,
 } from '@/api/cart'
-import { getProduct } from '@/api/catalog'
-import { toDetailProduct } from '@/views/products/mappers'
 import type { Product } from '@/data/products'
+import { toNumId } from './utils'
+import { useProductStore } from './products'
 
 export interface CartItem {
   productId: string
@@ -22,12 +22,6 @@ export interface CartItem {
 }
 
 const STORAGE_KEY = 'rekit.cart.v1'
-
-/** productId 문자열을 숫자로 변환. 실패 시 null. */
-function toNumId(productId: string): number | null {
-  const n = parseInt(productId, 10)
-  return isNaN(n) ? null : n
-}
 
 function loadFromStorage(): CartItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -43,6 +37,7 @@ function loadFromStorage(): CartItem[] {
 
 export const useCartStore = defineStore('cart', () => {
   const auth = useAuthStore()
+  const productStore = useProductStore()
 
   const items = ref<CartItem[]>(loadFromStorage())
 
@@ -90,20 +85,9 @@ export const useCartStore = defineStore('cart', () => {
     } catch { /* 게스트 아이템 유지 */ }
   }
 
-  /** 장바구니 페이지 진입 시 호출. 현재 아이템의 상품 정보를 서버에서 병렬 조회해 반환. */
+  /** 장바구니 페이지 진입 시 호출. 현재 아이템의 상품 정보를 bulk 조회해 반환. */
   async function loadProducts(): Promise<Record<string, Product>> {
-    const map: Record<string, Product> = {}
-    await Promise.all(
-      items.value.flatMap((i) => {
-        const id = toNumId(i.productId)
-        return id === null ? [] : [
-          getProduct(id)
-            .then((p) => { map[String(id)] = toDetailProduct(p) })
-            .catch(() => undefined),
-        ]
-      }),
-    )
-    return map
+    return productStore.fetchByIds(items.value.map((i) => i.productId))
   }
 
   if (typeof window !== 'undefined' && auth.isAuthenticated) loadServerCart()

@@ -637,6 +637,11 @@ const gradeShort = computed(() => {
   color: var(--rekit-danger);
   border-color: var(--rekit-danger);
 }
+.cta__heart--on svg,
+.sticky-cta__heart--on svg {
+  fill: var(--rekit-danger);
+  stroke: var(--rekit-danger);
+}
 @media (min-width: 1024px) {
   .cta {
     display: flex;
@@ -646,13 +651,13 @@ const gradeShort = computed(() => {
 /* sticky CTA (mobile only) */
 .sticky-cta {
   position: fixed;
-  bottom: 80px; /* above mobile tab bar */
+  bottom: calc(var(--rekit-tab-bar-height) + max(8px, env(safe-area-inset-bottom, 0px)));
   left: 0;
   right: 0;
   z-index: 30;
   display: flex;
   gap: 8px;
-  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+  padding: 12px 16px;
   background: var(--rekit-surface);
   border-top: 1px solid var(--rekit-border);
 }
