@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from 'vue'
+import { computed, onBeforeMount, ref, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
@@ -18,6 +18,7 @@ import {
   type OrderLineItem,
 } from '@/stores/orders'
 import { useAddressStore } from '@/stores/addresses'
+import { useKakaoPostcode } from '@/composables/useKakaoPostcode'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -25,6 +26,7 @@ const cart = useCartStore()
 const productStore = useProductStore()
 const orders = useOrderStore()
 const addresses = useAddressStore()
+const { searching: searchingZip, sdkLoading: zipLoading, container: zipContainer, openSearch } = useKakaoPostcode()
 
 interface Snapshot {
   productId: string
@@ -118,6 +120,17 @@ const formValid = computed(
 
 /* ────────────── Submit ────────────── */
 
+function bindZipContainer(el: Element | ComponentPublicInstance | null) {
+  zipContainer.value = el instanceof HTMLElement ? el : null
+}
+
+async function openZipSearch() {
+  await openSearch((result) => {
+    address.value.zipcode = result.zipcode
+    address.value.address = result.address
+  })
+}
+
 function pay() {
   submitted.value = true
   if (!formValid.value) {
@@ -196,28 +209,39 @@ function pay() {
               />
             </label>
           </div>
-          <div class="row row--zip">
-            <label class="field field--zip" :class="{ 'field--err': errors.zipcode }">
-              <span class="field__label">우편번호</span>
+          <div v-if="searchingZip" class="zip-embed">
+            <div class="zip-embed__frame-wrap">
+              <div :ref="bindZipContainer" class="zip-embed__frame" />
+              <div v-if="zipLoading" class="zip-embed__loading">
+                <span class="zip-embed__spinner" />
+              </div>
+            </div>
+            <button type="button" class="zip-embed__cancel" @click="searchingZip = false">취소</button>
+          </div>
+          <template v-else>
+            <div class="row row--zip">
+              <label class="field field--zip" :class="{ 'field--err': errors.zipcode }">
+                <span class="field__label">우편번호</span>
+                <input
+                  v-model="address.zipcode"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="04101"
+                  :aria-invalid="errors.zipcode"
+                />
+              </label>
+              <button type="button" class="zip-btn" @click="openZipSearch">주소 검색</button>
+            </div>
+            <label class="field" :class="{ 'field--err': errors.address }">
+              <span class="field__label">주소</span>
               <input
-                v-model="address.zipcode"
+                v-model="address.address"
                 type="text"
-                inputmode="numeric"
-                placeholder="04101"
-                :aria-invalid="errors.zipcode"
+                placeholder="도로명 주소"
+                :aria-invalid="errors.address"
               />
             </label>
-            <button type="button" class="zip-btn" disabled>주소 검색</button>
-          </div>
-          <label class="field" :class="{ 'field--err': errors.address }">
-            <span class="field__label">주소</span>
-            <input
-              v-model="address.address"
-              type="text"
-              placeholder="도로명 주소"
-              :aria-invalid="errors.address"
-            />
-          </label>
+          </template>
           <label class="field">
             <span class="field__label">상세 주소</span>
             <input
@@ -446,7 +470,61 @@ function pay() {
   font-size: 13px;
   font-weight: 600;
   color: var(--rekit-ink-muted);
-  cursor: not-allowed;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.zip-btn:hover {
+  background: var(--rekit-surface-muted);
+  color: var(--rekit-ink);
+}
+.zip-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.zip-embed__frame-wrap {
+  position: relative;
+  height: 400px;
+  border: 1px solid var(--rekit-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.zip-embed__frame {
+  width: 100%;
+  height: 100%;
+}
+.zip-embed__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rekit-surface);
+}
+.zip-embed__spinner {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--rekit-border);
+  border-top-color: var(--rekit-accent);
+  border-radius: 50%;
+  animation: zip-spin 0.7s linear infinite;
+}
+@keyframes zip-spin {
+  to { transform: rotate(360deg); }
+}
+.zip-embed__cancel {
+  align-self: flex-end;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.zip-embed__cancel:hover {
+  background: var(--rekit-surface-muted);
+  color: var(--rekit-ink);
 }
 
 /* items */

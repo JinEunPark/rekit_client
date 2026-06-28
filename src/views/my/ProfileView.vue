@@ -4,11 +4,17 @@ import { RouterLink, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
+import AppModal from '@/components/ds/AppModal.vue'
 import { useAuthStore } from '@/stores/auth'
+import { withdrawMe } from '@/api/users'
 
 const router = useRouter()
 const auth = useAuthStore()
 
+const withdrawing = ref(false)
+const withdrawOpen = ref(false)
+const withdrawPassword = ref('')
+const withdrawError = ref('')
 const editing = ref(false)
 const form = reactive({
   name: auth.user?.username ?? '',
@@ -43,12 +49,33 @@ function logout() {
   router.replace('/')
 }
 
-function deleteAccount() {
-  if (!window.confirm('정말 회원탈퇴 하시겠어요? 주문 내역과 관심상품을 포함한 모든 정보가 삭제돼요.')) return
-  // mock: just logout (real backend would request deletion)
-  auth.logout()
-  alert('탈퇴가 완료됐어요.')
-  router.replace('/')
+function openWithdrawModal() {
+  withdrawPassword.value = ''
+  withdrawError.value = ''
+  withdrawOpen.value = true
+}
+
+async function confirmWithdraw() {
+  if (!withdrawPassword.value) {
+    withdrawError.value = '비밀번호를 입력해 주세요.'
+    return
+  }
+  withdrawing.value = true
+  withdrawError.value = ''
+  try {
+    await withdrawMe(withdrawPassword.value)
+    withdrawOpen.value = false
+    auth.logout()
+    router.replace('/')
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    withdrawError.value =
+      code === 'INVALID_CREDENTIALS'
+        ? '비밀번호가 올바르지 않아요.'
+        : '탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    withdrawing.value = false
+  }
 }
 </script>
 
@@ -173,13 +200,39 @@ function deleteAccount() {
           </button>
         </li>
         <li>
-          <button type="button" class="action action--danger" @click="deleteAccount">
+          <button type="button" class="action action--danger" @click="openWithdrawModal">
             <span>회원탈퇴</span>
             <IconBase name="chevronRight" :size="14" />
           </button>
         </li>
       </ul>
     </section>
+
+    <!-- 회원탈퇴 확인 모달 -->
+    <AppModal :open="withdrawOpen" title="회원탈퇴" @close="withdrawOpen = false">
+      <p class="modal__desc">
+        탈퇴하면 관심상품·쿠폰 등 혜택이 모두 삭제돼요.<br>
+        주문 내역은 전자상거래법에 따라 5년간 보존됩니다.
+      </p>
+      <form novalidate @submit.prevent="confirmWithdraw">
+        <label class="field" :class="{ 'field--err': !!withdrawError }">
+          <span class="field__label">현재 비밀번호</span>
+          <input
+            v-model="withdrawPassword"
+            type="password"
+            placeholder="비밀번호 입력"
+            autocomplete="current-password"
+          />
+        </label>
+        <p v-if="withdrawError" class="field__errmsg">{{ withdrawError }}</p>
+        <div class="modal__cta">
+          <Button variant="secondary" size="lg" :style="{ flex: '1' }" :disabled="withdrawing" @click="withdrawOpen = false">취소</Button>
+          <Button type="submit" variant="danger" size="lg" :style="{ flex: '1.3' }" :disabled="withdrawing">
+            {{ withdrawing ? '처리 중…' : '탈퇴하기' }}
+          </Button>
+        </div>
+      </form>
+    </AppModal>
   </div>
 </template>
 
@@ -420,6 +473,23 @@ function deleteAccount() {
 }
 .action--danger {
   color: var(--rekit-danger);
+}
+
+/* withdraw modal content */
+.modal__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rekit-ink-muted);
+  line-height: 1.65;
+}
+.field__errmsg {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--rekit-danger);
+}
+.modal__cta {
+  display: flex;
+  gap: 8px;
 }
 
 /* guest */

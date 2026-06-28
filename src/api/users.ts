@@ -17,3 +17,7 @@ export function changePassword(payload: ChangePasswordPayload): Promise<void> {
     auth: true,
   })
 }
+
+export function withdrawMe(password: string): Promise<void> {
+  return apiRequest<void>('/users/me', { method: 'DELETE', body: { password }, auth: true })
+}

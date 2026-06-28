@@ -1156,22 +1156,31 @@ POST /help/contact
 
 ### 12.1 우편번호 검색
 
-```
-GET /addresses/lookup?q=양화로
+**구현 방식: 카카오 우편번호 SDK (클라이언트 직접 연동)**
+
+백엔드 API 없이 카카오 우편번호 SDK를 클라이언트에서 직접 사용한다.
+SDK는 첫 호출 시 동적으로 로드되며, 팝업 UI는 SDK가 자체 제공한다.
+
+**composable**: `src/composables/useKakaoPostcode.ts`
+
+```ts
+// 사용 예시
+const { search } = useKakaoPostcode()
+
+await search((result) => {
+  form.zipcode = result.zipcode   // 예: "04101"
+  form.address = result.address   // 예: "서울특별시 마포구 양화로 45"
+})
 ```
 
-**Public**
+**적용 위치**
+- `src/views/my/AddressesView.vue` — 배송지 추가/수정 모달
+- `src/views/checkout/OrderView.vue` — 주문서 배송지 입력
 
-**Response 200**
-```json
-{
-  "data": [
-    { "zipcode": "04101", "address": "서울특별시 마포구 양화로 45" }
-  ]
-}
-```
+**SDK 출처**: `//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js`
+(무료, 별도 API 키 불필요)
 
-> 또는 클라이언트에서 카카오 우편번호 SDK (postcode.map.daum.net) 직접 사용 권장 — 백엔드 API 불필요.
+> 백엔드 `GET /addresses/lookup?q=` 엔드포인트는 구현하지 않는다 — SDK로 대체.
 
 ---
 
