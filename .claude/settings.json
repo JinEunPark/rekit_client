@@ -7,7 +7,18 @@
       "Bash(curl -s -X POST http://localhost:8000/api/v1/users/me/password -H 'Content-Type: application/json' -H 'Authorization: Bearer fake' -d '{\"currentPassword\":\"x\",\"newPassword\":\"x\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
       "Bash(python3 -c ' *)",
       "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/email/send-verification -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -d '{\"email\":\"test@example.com\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
-      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/email/verify-code -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -d '{\"email\":\"test@example.com\",\"code\":\"000000\"}' -w '\\\\nHTTP %{http_code}\\\\n')"
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/email/verify-code -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -d '{\"email\":\"test@example.com\",\"code\":\"000000\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(curl -s http://localhost:5179)",
+      "Bash(npx playwright *)",
+      "Bash(node cart-test.mjs)",
+      "Bash(node /private/tmp/claude-501/-Volumes-A-web-projects-rekle/8c25ebe7-f496-47d4-be81-de19c5b539fa/scratchpad/cart-test.mjs)",
+      "Read(//Users/bagjin-eun/**)",
+      "Bash(npm root *)",
+      "WebFetch(domain:localhost)",
+      "Bash(npm run type-check *)",
+      "Bash(curl -s http://localhost:8000/openapi.json *)"
     ]
   }
 }

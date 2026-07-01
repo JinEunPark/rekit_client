@@ -15,6 +15,7 @@ import { useOrderStore } from '@/stores/orders'
 import type { ShipmentMethod } from '@/api/orders'
 import { toNumId } from '@/stores/utils'
 import { useAddressStore } from '@/stores/addresses'
+import { ApiError } from '@/api/client'
 
 type DeliveryMethod = 'direct' | 'cargo'
 
@@ -131,8 +132,15 @@ async function pay() {
 
     snapshot.value.forEach((s) => cart.remove(s.productId))
     router.replace(`/checkout/complete?order=${order.orderNumber}`)
-  } catch {
-    payError.value = '주문 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
+  } catch (err) {
+    console.error('[pay]', err)
+    if (err instanceof ApiError) {
+      payError.value = err.message || `오류가 발생했어요. (${err.status})`
+    } else if (err instanceof Error) {
+      payError.value = err.message
+    } else {
+      payError.value = '주문 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
+    }
   } finally {
     paying.value = false
   }
@@ -180,14 +188,28 @@ async function pay() {
               <span v-if="a.isDefault" class="addr-chip__default">기본</span>
             </span>
             <span class="addr-chip__name">{{ a.recipient }}</span>
+            <span class="addr-chip__addr">{{ a.address }}</span>
           </button>
         </div>
 
         <!-- Selected address card -->
         <div v-if="selectedAddr" class="addr-card">
-          <div class="addr-card__name">{{ selectedAddr.recipient }} · {{ selectedAddr.phone }}</div>
-          <div class="addr-card__line">{{ selectedAddr.address }}{{ selectedAddr.addressDetail ? ' ' + selectedAddr.addressDetail : '' }}</div>
-          <div v-if="selectedAddr.memo" class="addr-card__memo">메모 · {{ selectedAddr.memo }}</div>
+          <div class="addr-card__row">
+            <span class="addr-card__key">받는사람</span>
+            <span class="addr-card__val">{{ selectedAddr.recipient }}</span>
+          </div>
+          <div class="addr-card__row">
+            <span class="addr-card__key">전화번호</span>
+            <span class="addr-card__val">{{ selectedAddr.phone }}</span>
+          </div>
+          <div class="addr-card__row">
+            <span class="addr-card__key">주소지</span>
+            <span class="addr-card__val">{{ selectedAddr.address }}{{ selectedAddr.addressDetail ? ' ' + selectedAddr.addressDetail : '' }}</span>
+          </div>
+          <div v-if="selectedAddr.memo" class="addr-card__row">
+            <span class="addr-card__key">메모</span>
+            <span class="addr-card__val">{{ selectedAddr.memo }}</span>
+          </div>
         </div>
       </section>
 
@@ -328,13 +350,16 @@ async function pay() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .block__title {
-  margin: 0;
+  margin: 0 0 16px;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
+}
+.block__head .block__title {
+  margin-bottom: 0;
 }
 .block__manage {
   font-size: 12.5px;
@@ -376,78 +401,121 @@ async function pay() {
 /* address chips */
 .addr-picker {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 2px;
-  margin-bottom: 12px;
+  padding: 0 0 4px;
+  margin: 0 -16px 16px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 .addr-picker::-webkit-scrollbar { display: none; }
 .addr-chip {
-  flex: 0 0 auto;
+  flex: 0 0 156px;
+  width: 156px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 10px 14px;
+  gap: 3px;
+  padding: 12px 14px;
   background: var(--rekit-surface);
   border: 1.5px solid var(--rekit-border);
-  border-radius: 12px;
+  border-radius: 14px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  overflow: hidden;
 }
-.addr-chip:hover { border-color: var(--rekit-ink-muted); }
+.addr-chip:hover {
+  border-color: var(--rekit-ink-muted);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
 .addr-chip--on {
   border-color: var(--rekit-ink);
-  background: var(--rekit-surface-muted);
+  background: var(--rekit-ink);
 }
 .addr-chip__top {
   display: flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
 }
 .addr-chip__label {
   font-size: 11px;
   font-weight: 700;
   color: var(--rekit-ink-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.addr-chip--on .addr-chip__label {
+  color: rgba(255,255,255,0.6);
 }
 .addr-chip__default {
+  flex-shrink: 0;
   font-size: 10px;
   font-weight: 700;
   color: var(--rekit-accent-deep);
   background: var(--rekit-accent-soft);
   padding: 1px 5px;
-  border-radius: 6px;
+  border-radius: 5px;
+}
+.addr-chip--on .addr-chip__default {
+  color: var(--rekit-ink);
+  background: rgba(255,255,255,0.85);
 }
 .addr-chip__name {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--rekit-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.addr-chip--on .addr-chip__name {
+  color: #fff;
+}
+.addr-chip__addr {
+  font-size: 11px;
+  color: var(--rekit-ink-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.addr-chip--on .addr-chip__addr {
+  color: rgba(255,255,255,0.55);
 }
 
 /* selected address card */
 .addr-card {
-  padding: 14px 16px;
-  background: var(--rekit-surface-muted);
-  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--rekit-surface);
+  border: 1px solid var(--rekit-border);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 }
-.addr-card__name {
-  font-size: 13.5px;
-  font-weight: 700;
+.addr-card__row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+  align-items: baseline;
 }
-.addr-card__line {
-  font-size: 13px;
-  color: var(--rekit-ink-muted);
-  line-height: 1.5;
-}
-.addr-card__memo {
+.addr-card__key {
   font-size: 12px;
-  color: var(--rekit-ink-subtle);
-  margin-top: 2px;
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+  white-space: nowrap;
+}
+.addr-card__val {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rekit-ink);
+  line-height: 1.5;
 }
 
 /* items */
