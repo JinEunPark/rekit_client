@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getAccessToken, setAccessToken } from '@/api/client'
 import { signOut as apiSignOut } from '@/api/auth'
-import { getMe } from '@/api/users'
+import { getMe, updateProfile as apiUpdateProfile } from '@/api/users'
 
 export interface User {
   /** Login ID (username on server). */
@@ -89,9 +89,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(payload: { username?: string; phone?: string | null }): Promise<void> {
+    const res = await apiUpdateProfile(payload)
+    user.value = {
+      loginId: res.loginId,
+      username: res.username,
+      email: res.email,
+      phone: res.phone ?? undefined,
+      verified: res.verified,
+      ecoKg: res.ecoKg,
+    }
+    persist()
+  }
+
   if (typeof window !== 'undefined') {
     window.addEventListener('rekit:auth-expired', clearLocal)
   }
 
-  return { user, isAuthenticated, initial, login, setSession, fetchMe, logout }
+  return { user, isAuthenticated, initial, login, setSession, fetchMe, logout, updateProfile }
 })

@@ -7,36 +7,34 @@ import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderStore, type OrderStatus } from '@/stores/orders'
-import { isAwaitingDeposit, statusTone } from '@/stores/orders-helpers'
+import { statusLabel, statusTone } from '@/stores/orders-helpers'
 
 const route = useRoute()
 const auth = useAuthStore()
 const orders = useOrderStore()
 
-const FILTERS: { key: OrderStatus | 'all' | '입금'; label: string }[] = [
+const FILTERS: { key: OrderStatus | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
-  { key: '입금', label: '입금 안내' },
-  { key: '결제완료', label: '결제완료' },
-  { key: '준비중', label: '준비중' },
-  { key: '배송중', label: '배송중' },
-  { key: '배송완료', label: '배송완료' },
-  { key: '취소', label: '취소' },
+  { key: 'PENDING', label: '결제대기' },
+  { key: 'PAID', label: '결제완료' },
+  { key: 'PREPARING', label: '준비중' },
+  { key: 'SHIPPING', label: '배송중' },
+  { key: 'DELIVERED', label: '배송완료' },
+  { key: 'CANCELLED', label: '취소' },
 ]
 
-type FilterKey = OrderStatus | 'all' | '입금'
+type FilterKey = OrderStatus | 'all'
 const filter = ref<FilterKey>((route.query.status as FilterKey) ?? 'all')
 
 const filteredOrders = computed(() => {
   if (filter.value === 'all') return orders.orders
-  if (filter.value === '입금') return orders.orders.filter((o) => isAwaitingDeposit(o.status))
   return orders.orders.filter((o) => o.status === filter.value)
 })
 
 const counts = computed(() => {
-  const map: Partial<Record<FilterKey, number>> = { all: orders.orders.length, 입금: 0 }
+  const map: Partial<Record<FilterKey, number>> = { all: orders.orders.length }
   for (const o of orders.orders) {
     map[o.status] = (map[o.status] ?? 0) + 1
-    if (isAwaitingDeposit(o.status)) map['입금'] = (map['입금'] ?? 0) + 1
   }
   return map
 })
@@ -49,8 +47,14 @@ function formatDate(iso: string) {
 function summarizeItems(o: (typeof orders.orders)[number]) {
   const first = o.items[0]
   if (!first) return ''
-  if (o.items.length === 1) return first.title
-  return `${first.title} 외 ${o.items.length - 1}건`
+  if (o.items.length === 1) return first.titleSnapshot
+  return `${first.titleSnapshot} 외 ${o.items.length - 1}건`
+}
+
+function shippingLabel(method: string) {
+  if (method === 'DIRECT') return '직접배송'
+  if (method === 'FREIGHT') return '화물택배'
+  return '택배'
 }
 </script>
 
@@ -68,7 +72,7 @@ function summarizeItems(o: (typeof orders.orders)[number]) {
   <div v-else class="page">
     <header class="page__head">
       <h1 class="page__title">주문 내역</h1>
-      <span class="page__count">총 {{ orders.orders.length }}건</span>
+      <span class="page__count">총 {{ orders.total }}건</span>
     </header>
 
     <!-- Status tabs -->
@@ -104,31 +108,31 @@ function summarizeItems(o: (typeof orders.orders)[number]) {
 
     <!-- List -->
     <ul v-else class="list">
-      <li v-for="o in filteredOrders" :key="o.id" class="card">
+      <li v-for="o in filteredOrders" :key="o.orderNumber" class="card">
         <header class="card__head">
-          <Badge :tone="statusTone(o.status)" size="sm">{{ o.status }}</Badge>
-          <span class="card__id">{{ o.id }}</span>
+          <Badge :tone="statusTone(o.status)" size="sm">{{ statusLabel(o.status) }}</Badge>
+          <span class="card__id">{{ o.orderNumber }}</span>
           <span class="card__date">{{ formatDate(o.createdAt) }}</span>
         </header>
-        <RouterLink :to="`/my/orders/${o.id}`" class="card__body">
+        <RouterLink :to="`/my/orders/${o.orderNumber}`" class="card__body">
           <div class="card__row">
             <div class="card__title">{{ summarizeItems(o) }}</div>
             <IconBase name="chevronRight" :size="16" class="card__chev" />
           </div>
           <div class="card__meta">
-            <span>{{ o.deliveryMethod === 'direct' ? '직접배송' : '화물택배' }}</span>
-            <span class="card__sep">·</span>
-            <span>{{ o.estimatedDelivery }}</span>
+            <span>{{ shippingLabel(o.shippingMethod) }}</span>
           </div>
         </RouterLink>
         <footer class="card__foot">
           <div class="card__total">
             <span class="card__total-l">결제 금액</span>
-            <span class="card__total-v">{{ won(o.total) }}</span>
+            <span class="card__total-v">{{ won(o.totalAmount) }}</span>
           </div>
           <div class="card__actions">
             <Button variant="secondary" size="sm">배송조회</Button>
-            <Button variant="secondary" size="sm">주문상세</Button>
+            <RouterLink :to="'/my/orders/' + o.orderNumber">
+              <Button variant="secondary" size="sm">주문상세</Button>
+            </RouterLink>
           </div>
         </footer>
       </li>

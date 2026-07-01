@@ -11,38 +11,90 @@ import { withdrawMe } from '@/api/users'
 const router = useRouter()
 const auth = useAuthStore()
 
-const withdrawing = ref(false)
-const withdrawOpen = ref(false)
-const withdrawPassword = ref('')
-const withdrawError = ref('')
+// ── 이름 수정 ──────────────────────────────────────────────
 const editing = ref(false)
-const form = reactive({
-  name: auth.user?.username ?? '',
-  email: auth.user?.email ?? '',
-})
+const saving = ref(false)
+const saveError = ref('')
+const form = reactive({ name: auth.user?.username ?? '' })
 
 function startEdit() {
   if (!auth.user) return
   form.name = auth.user.username
-  form.email = auth.user.email
+  saveError.value = ''
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
+  saveError.value = ''
 }
 
-const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-const canSave = computed(() => form.name.trim().length > 0 && emailValid.value)
-
-function save() {
-  if (!auth.user || !canSave.value) return
-  auth.user.username = form.name.trim()
-  auth.user.email = form.email.trim()
-  // persist immediately
-  localStorage.setItem('rekit.auth.user.v3', JSON.stringify(auth.user))
-  editing.value = false
+async function save() {
+  if (!auth.user || !form.name.trim()) return
+  saving.value = true
+  saveError.value = ''
+  try {
+    await auth.updateProfile({ username: form.name.trim() })
+    editing.value = false
+  } catch {
+    saveError.value = '저장에 실패했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    saving.value = false
+  }
 }
+
+// ── 휴대폰 변경 ────────────────────────────────────────────
+const phoneEdit = reactive({
+  open: false,
+  newPhone: '',
+  codeSent: false,
+  code: '',
+  sending: false,
+  verifying: false,
+  error: '',
+})
+
+const newPhoneValid = computed(() => /^01[016789]\d{7,8}$/.test(phoneEdit.newPhone.trim()))
+
+function openPhoneEdit() {
+  phoneEdit.open = !phoneEdit.open
+  phoneEdit.newPhone = auth.user?.phone ?? ''
+  phoneEdit.codeSent = false
+  phoneEdit.code = ''
+  phoneEdit.error = ''
+}
+
+function sendPhoneCode() {
+  if (!newPhoneValid.value) {
+    phoneEdit.error = '올바른 휴대폰 번호를 입력해 주세요. (01012345678 형식)'
+    return
+  }
+  phoneEdit.error = ''
+  phoneEdit.codeSent = true
+}
+
+async function confirmPhoneCode() {
+  if (phoneEdit.code.length !== 6) {
+    phoneEdit.error = '6자리 인증번호를 입력해 주세요.'
+    return
+  }
+  phoneEdit.verifying = true
+  phoneEdit.error = ''
+  try {
+    await auth.updateProfile({ phone: phoneEdit.newPhone.trim() })
+    phoneEdit.open = false
+  } catch {
+    phoneEdit.error = '휴대폰 번호 변경에 실패했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    phoneEdit.verifying = false
+  }
+}
+
+// ── 로그아웃 / 탈퇴 ────────────────────────────────────────
+const withdrawing = ref(false)
+const withdrawOpen = ref(false)
+const withdrawPassword = ref('')
+const withdrawError = ref('')
 
 function logout() {
   auth.logout()
@@ -110,45 +162,90 @@ async function confirmWithdraw() {
 
     <!-- Editable info -->
     <section class="block">
-      <header class="block__head">
-        <h2>기본 정보</h2>
-        <button v-if="!editing" type="button" class="link" @click="startEdit">수정</button>
-        <button v-else type="button" class="link" @click="cancelEdit">취소</button>
-      </header>
+      <h2 class="block__title">기본 정보</h2>
 
-      <dl v-if="!editing" class="info">
+      <dl class="info">
+        <!-- 이름 -->
         <div class="info__row">
           <dt>이름</dt>
           <dd>{{ auth.user.username }}</dd>
+          <button v-if="!editing" type="button" class="link link--sm" @click="startEdit">수정</button>
+          <button v-else type="button" class="link link--sm" @click="cancelEdit">취소</button>
         </div>
+        <div v-if="editing" class="info__expand">
+          <form novalidate @submit.prevent="save">
+            <div class="verify-row">
+              <input v-model="form.name" type="text" placeholder="이름" class="verify-input" />
+              <button type="submit" class="verify-btn" :disabled="!form.name.trim() || saving">
+                {{ saving ? '저장 중…' : '저장' }}
+              </button>
+            </div>
+            <p v-if="saveError" class="field__errmsg">{{ saveError }}</p>
+          </form>
+        </div>
+
+        <!-- 아이디 -->
         <div class="info__row">
           <dt>아이디</dt>
           <dd>{{ auth.user.loginId }}</dd>
         </div>
+
+        <!-- 이메일 -->
         <div class="info__row">
           <dt>이메일</dt>
           <dd>{{ auth.user.email }}</dd>
         </div>
+
+        <!-- 휴대폰 -->
         <div class="info__row">
           <dt>휴대폰</dt>
           <dd>
             <span v-if="auth.user.phone">{{ auth.user.phone }}</span>
-            <span v-else class="info__empty">미등록 (본인인증 시 자동 등록)</span>
+            <span v-else class="info__empty">미등록</span>
           </dd>
+          <button type="button" class="link link--sm" @click="openPhoneEdit">
+            {{ phoneEdit.open ? '취소' : auth.user.phone ? '변경' : '등록' }}
+          </button>
+        </div>
+        <div v-if="phoneEdit.open" class="info__expand">
+          <div class="verify-row">
+            <input
+              v-model="phoneEdit.newPhone"
+              type="tel"
+              placeholder="01012345678"
+              inputmode="numeric"
+              class="verify-input"
+            />
+            <button
+              type="button"
+              class="verify-btn"
+              :disabled="phoneEdit.sending"
+              @click="sendPhoneCode"
+            >
+              {{ phoneEdit.codeSent ? '재전송' : '인증번호 전송' }}
+            </button>
+          </div>
+          <div v-if="phoneEdit.codeSent" class="verify-row">
+            <input
+              v-model="phoneEdit.code"
+              type="text"
+              placeholder="인증번호 6자리"
+              maxlength="6"
+              inputmode="numeric"
+              class="verify-input"
+            />
+            <button
+              type="button"
+              class="verify-btn"
+              :disabled="phoneEdit.verifying"
+              @click="confirmPhoneCode"
+            >
+              {{ phoneEdit.verifying ? '확인 중…' : '확인' }}
+            </button>
+          </div>
+          <p v-if="phoneEdit.error" class="field__errmsg">{{ phoneEdit.error }}</p>
         </div>
       </dl>
-
-      <form v-else class="form" novalidate @submit.prevent="save">
-        <label class="field">
-          <span class="field__label">이름</span>
-          <input v-model="form.name" type="text" placeholder="이름" />
-        </label>
-        <label class="field" :class="{ 'field--err': !emailValid && form.email.length > 0 }">
-          <span class="field__label">이메일</span>
-          <input v-model="form.email" type="email" placeholder="you@example.com" />
-        </label>
-        <Button type="submit" variant="accent" size="md" full :disabled="!canSave">저장</Button>
-      </form>
     </section>
 
     <!-- Verification status -->
@@ -375,26 +472,29 @@ async function confirmWithdraw() {
   font-weight: 500;
 }
 
-/* form */
-.form {
+/* inline field expand */
+.info__expand {
+  padding: 8px 0 14px;
+  border-bottom: 1px solid var(--rekit-border);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
-.field {
+.info__expand form {
+  display: contents;
+}
+
+/* input + button row */
+.verify-row {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  gap: 8px;
+  align-items: center;
 }
-.field__label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--rekit-ink-muted);
-}
-.field input {
-  width: 100%;
-  height: 48px;
-  padding: 0 14px;
+.verify-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
   background: var(--rekit-surface);
   border: 1px solid var(--rekit-border);
   border-radius: 10px;
@@ -404,12 +504,34 @@ async function confirmWithdraw() {
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.field input:focus {
+.verify-input:focus {
   border-color: var(--rekit-ink);
   box-shadow: 0 0 0 3px rgba(26, 26, 23, 0.06);
 }
-.field--err input {
-  border-color: var(--rekit-danger);
+.verify-btn {
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--rekit-ink);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: opacity 0.12s;
+}
+.verify-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.verify-btn:not(:disabled):hover {
+  opacity: 0.82;
+}
+
+.link--sm {
+  font-size: 11.5px;
+  flex-shrink: 0;
 }
 
 /* verify */

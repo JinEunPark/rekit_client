@@ -5,6 +5,15 @@ export function getMe(): Promise<UserResponse> {
   return apiRequest<UserResponse>('/users/me', { method: 'GET', auth: true })
 }
 
+export interface UpdateProfilePayload {
+  username?: string | null
+  phone?: string | null
+}
+
+export function updateProfile(payload: UpdateProfilePayload): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/users/me', { method: 'PATCH', body: payload, auth: true })
+}
+
 export interface ChangePasswordPayload {
   currentPassword: string
   newPassword: string

@@ -6,20 +6,20 @@ import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import { won } from '@/design/tokens'
 import { useOrderStore, type Order } from '@/stores/orders'
-import { isAwaitingDeposit, statusTone } from '@/stores/orders-helpers'
+import { statusLabel, statusTone } from '@/stores/orders-helpers'
 
-type TabId = 'all' | 'deposit' | 'paid' | 'prepping' | 'shipping' | 'delivered' | 'cancelled'
+type TabId = 'all' | 'pending' | 'paid' | 'prepping' | 'shipping' | 'delivered' | 'cancelled'
 
 const orderStore = useOrderStore()
 
 const tabs: { id: TabId; t: string; match: (o: Order) => boolean }[] = [
   { id: 'all', t: '전체', match: () => true },
-  { id: 'deposit', t: '입금 안내', match: (o) => isAwaitingDeposit(o.status) },
-  { id: 'paid', t: '결제완료', match: (o) => o.status === '결제완료' },
-  { id: 'prepping', t: '준비중', match: (o) => o.status === '준비중' },
-  { id: 'shipping', t: '배송중', match: (o) => o.status === '배송중' },
-  { id: 'delivered', t: '배송완료', match: (o) => o.status === '배송완료' },
-  { id: 'cancelled', t: '취소/환불', match: (o) => o.status === '취소' },
+  { id: 'pending', t: '결제대기', match: (o) => o.status === 'PENDING' },
+  { id: 'paid', t: '결제완료', match: (o) => o.status === 'PAID' },
+  { id: 'prepping', t: '준비중', match: (o) => o.status === 'PREPARING' },
+  { id: 'shipping', t: '배송중', match: (o) => o.status === 'SHIPPING' },
+  { id: 'delivered', t: '배송완료', match: (o) => o.status === 'DELIVERED' },
+  { id: 'cancelled', t: '취소/환불', match: (o) => o.status === 'CANCELLED' || o.status === 'REFUNDED' },
 ]
 
 const active = ref<TabId>('all')
@@ -27,51 +27,34 @@ const active = ref<TabId>('all')
 const counts = computed(() => {
   const map: Record<TabId, number> = {
     all: orderStore.orders.length,
-    deposit: 0, paid: 0, prepping: 0, shipping: 0, delivered: 0, cancelled: 0,
+    pending: 0, paid: 0, prepping: 0, shipping: 0, delivered: 0, cancelled: 0,
   }
   for (const o of orderStore.orders) {
-    if (isAwaitingDeposit(o.status)) map.deposit++
-    if (o.status === '결제완료') map.paid++
-    if (o.status === '준비중') map.prepping++
-    if (o.status === '배송중') map.shipping++
-    if (o.status === '배송완료') map.delivered++
-    if (o.status === '취소') map.cancelled++
+    if (o.status === 'PENDING') map.pending++
+    if (o.status === 'PAID') map.paid++
+    if (o.status === 'PREPARING') map.prepping++
+    if (o.status === 'SHIPPING') map.shipping++
+    if (o.status === 'DELIVERED') map.delivered++
+    if (o.status === 'CANCELLED' || o.status === 'REFUNDED') map.cancelled++
   }
   return map
 })
 
 const filtered = computed(() => {
   const tab = tabs.find((t) => t.id === active.value)!
-  const list = orderStore.orders.filter(tab.match)
-  // Within deposit-pending, push 결제확인요청(buyer-claimed paid) to the top — admin priority.
-  if (active.value === 'deposit' || active.value === 'all') {
-    return [...list].sort((a, b) => {
-      const aReq = a.status === '결제확인요청' ? 0 : 1
-      const bReq = b.status === '결제확인요청' ? 0 : 1
-      return aReq - bReq
-    })
-  }
-  return list
+  return orderStore.orders.filter(tab.match)
 })
 
 const todaySummary = computed(() => {
   const today = new Date().toISOString().slice(0, 10)
   const todayOrders = orderStore.orders.filter((o) => o.createdAt.slice(0, 10) === today)
-  const pending = orderStore.orders.filter((o) => isAwaitingDeposit(o.status)).length
+  const pending = orderStore.orders.filter((o) => o.status === 'PENDING').length
   return { today: todayOrders.length, pending }
 })
 
 function formatDate(iso: string) {
   const d = new Date(iso)
   return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function approve(id: string) {
-  orderStore.approvePayment(id)
-}
-
-function moveToPrepping(id: string) {
-  orderStore.setStatus(id, '준비중')
 }
 </script>
 
@@ -91,10 +74,10 @@ function moveToPrepping(id: string) {
         :key="s.id"
         type="button"
         class="tab"
-        :class="{ 'tab--active': active === s.id, 'tab--alert': s.id === 'deposit' && counts.deposit > 0 }"
+        :class="{ 'tab--active': active === s.id, 'tab--alert': s.id === 'pending' && counts.pending > 0 }"
         @click="active = s.id"
       >
-        <span v-if="s.id === 'deposit' && counts.deposit > 0" class="tab__dot" />
+        <span v-if="s.id === 'pending' && counts.pending > 0" class="tab__dot" />
         {{ s.t }}
         <span class="tab__n">{{ counts[s.id] }}</span>
       </button>
@@ -106,50 +89,48 @@ function moveToPrepping(id: string) {
       </div>
       <div
         v-for="(o, i) in filtered"
-        :key="o.id"
+        :key="o.orderNumber"
         class="table__row"
         :class="{
           'table__row--first': i === 0,
-          'table__row--alert': o.status === '결제확인요청',
+          'table__row--alert': o.status === 'PENDING',
         }"
       >
         <span class="cb" />
         <div>
-          <div class="id">{{ o.id }}</div>
+          <div class="id">{{ o.orderNumber }}</div>
           <div class="date">{{ formatDate(o.createdAt) }}</div>
         </div>
         <div>
-          <div class="name">{{ o.address.recipient }}</div>
-          <div class="phone">{{ o.address.phone }}</div>
+          <div class="name">{{ o.recipientName }}</div>
+          <div class="phone">{{ o.recipientPhone }}</div>
         </div>
         <span class="items">
-          {{ o.items[0]?.title ?? '—' }}{{ o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : '' }}
+          {{ o.items[0]?.titleSnapshot ?? '—' }}{{ o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : '' }}
         </span>
-        <span class="amt">{{ won(o.total) }}</span>
+        <span class="amt">{{ won(o.totalAmount) }}</span>
         <span>
-          <Badge :tone="statusTone(o.status)" size="sm">{{ o.status }}</Badge>
+          <Badge :tone="statusTone(o.status)" size="sm">{{ statusLabel(o.status) }}</Badge>
         </span>
         <span class="tracking">—</span>
         <span class="action">
           <Button
-            v-if="isAwaitingDeposit(o.status)"
+            v-if="o.status === 'PENDING'"
             variant="accent"
             size="sm"
             leading-icon="check"
-            @click="approve(o.id)"
           >
             결제 승인
           </Button>
           <Button
-            v-else-if="o.status === '결제완료'"
+            v-else-if="o.status === 'PAID'"
             variant="primary"
             size="sm"
-            @click="moveToPrepping(o.id)"
           >
             준비 시작
           </Button>
           <Button
-            v-else-if="o.status === '준비중'"
+            v-else-if="o.status === 'PREPARING'"
             variant="primary"
             size="sm"
           >
@@ -167,9 +148,9 @@ function moveToPrepping(id: string) {
       </div>
     </div>
 
-    <div v-if="counts.deposit > 0 && active !== 'deposit'" class="hint">
+    <div v-if="counts.pending > 0 && active !== 'pending'" class="hint">
       <IconBase name="info" :size="14" />
-      <span>입금 확인이 필요한 주문이 <b>{{ counts.deposit }}건</b> 있어요. "입금 안내" 탭에서 처리하세요.</span>
+      <span>결제 대기 주문이 <b>{{ counts.pending }}건</b> 있어요. "결제대기" 탭에서 확인하세요.</span>
     </div>
   </AdminShell>
 </template>

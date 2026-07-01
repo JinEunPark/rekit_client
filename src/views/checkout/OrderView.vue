@@ -11,13 +11,21 @@ import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useProductStore } from '@/stores/products'
 import type { Product } from '@/data/products'
-import {
-  useOrderStore,
-  type DeliveryMethod,
-  type OrderAddress,
-  type OrderLineItem,
-} from '@/stores/orders'
-import { useAddressStore } from '@/stores/addresses'
+import { useOrderStore } from '@/stores/orders'
+import type { ShipmentMethod } from '@/api/orders'
+import { toNumId } from '@/stores/utils'
+
+type DeliveryMethod = 'direct' | 'cargo'
+
+interface OrderAddress {
+  recipient: string
+  phone: string
+  zipcode: string
+  address: string
+  addressDetail: string
+  memo?: string
+}
+import { useAddressStore, type Address } from '@/stores/addresses'
 import { useKakaoPostcode } from '@/composables/useKakaoPostcode'
 
 const router = useRouter()
@@ -120,6 +128,9 @@ const formValid = computed(
 
 /* ────────────── Submit ────────────── */
 
+const paying = ref(false)
+const payError = ref('')
+
 function bindZipContainer(el: Element | ComponentPublicInstance | null) {
   zipContainer.value = el instanceof HTMLElement ? el : null
 }
@@ -131,43 +142,62 @@ async function openZipSearch() {
   })
 }
 
-function pay() {
+async function pay() {
   submitted.value = true
   if (!formValid.value) {
     document.querySelector<HTMLElement>('.form input[aria-invalid="true"]')?.focus()
     return
   }
 
-  const lineItems: OrderLineItem[] = snapshot.value.map((s) => ({
-    productId: s.productId,
-    qty: s.qty,
-    price: s.product!.price,
-    title: s.product!.title,
-    brand: s.product!.brand,
-  }))
+  paying.value = true
+  payError.value = ''
 
-  const order = orders.create({
-    items: lineItems,
-    itemsTotal: itemsTotal.value,
-    shippingFee: shippingFee.value,
-    total: finalTotal.value,
-    deliveryMethod: deliveryMethod.value,
-    paymentMethod: 'bank',
-    paymentMethodLabel: paymentLabel,
-    address: { ...address.value },
-  })
+  try {
+    // 1. 배송지 저장 → address_id 확보
+    let addressId: number | null = null
+    if (addresses.defaultAddress) {
+      await addresses.update(addresses.defaultAddress.id, {
+        recipient: address.value.recipient,
+        phone: address.value.phone,
+        zipcode: address.value.zipcode,
+        address: address.value.address,
+        addressDetail: address.value.addressDetail,
+        memo: address.value.memo,
+      })
+      addressId = toNumId(addresses.defaultAddress.id)
+    } else {
+      await addresses.add({ ...address.value, label: '기본 배송지', isDefault: true })
+      // TypeScript narrows defaultAddress to null in this else-branch; cast to re-evaluate
+      const freshDefault = addresses.defaultAddress as Address | null
+      addressId = freshDefault ? toNumId(freshDefault.id) : null
+    }
+    if (!addressId) throw new Error('배송지 저장에 실패했어요.')
 
-  // remember address for next time — update existing default or create new
-  if (addresses.defaultAddress) {
-    addresses.update(addresses.defaultAddress.id, address.value)
-  } else {
-    addresses.add({ ...address.value, label: '기본 배송지', isDefault: true })
+    // 2. 주문 생성
+    const shippingMethod: ShipmentMethod =
+      deliveryMethod.value === 'direct' ? 'DIRECT'
+      : deliveryMethod.value === 'cargo' ? 'FREIGHT'
+      : 'PARCEL'
+
+    const order = await orders.create({
+      items: snapshot.value.map((s) => ({
+        product_id: parseInt(s.productId, 10),
+        quantity: s.qty,
+      })),
+      address_id: addressId,
+      shipping_method: shippingMethod,
+      memo: address.value.memo || null,
+    })
+
+    // 3. 장바구니에서 주문 상품 제거
+    snapshot.value.forEach((s) => cart.remove(s.productId))
+
+    router.replace(`/checkout/complete?order=${order.orderNumber}`)
+  } catch {
+    payError.value = '주문 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    paying.value = false
   }
-
-  // remove ordered lines from cart
-  snapshot.value.forEach((s) => cart.remove(s.productId))
-
-  router.replace(`/checkout/complete?order=${order.id}`)
 }
 </script>
 
@@ -343,16 +373,18 @@ function pay() {
 
       <!-- Inline CTA (desktop) -->
       <div class="inline-cta">
-        <Button type="submit" variant="accent" size="lg" full>
-          {{ won(finalTotal) }} 주문하기
+        <p v-if="payError" class="pay-error">{{ payError }}</p>
+        <Button type="submit" variant="accent" size="lg" full :disabled="paying">
+          {{ paying ? '처리 중…' : won(finalTotal) + ' 주문하기' }}
         </Button>
       </div>
     </form>
 
     <!-- Sticky CTA (mobile) -->
     <div class="sticky-cta">
-      <Button variant="accent" size="lg" full @click="pay">
-        {{ won(finalTotal) }} 결제하기
+      <p v-if="payError" class="pay-error">{{ payError }}</p>
+      <Button variant="accent" size="lg" full :disabled="paying" @click="pay">
+        {{ paying ? '처리 중…' : won(finalTotal) + ' 결제하기' }}
       </Button>
     </div>
   </div>
@@ -710,6 +742,12 @@ function pay() {
   }
 }
 
+.pay-error {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--rekit-danger);
+  text-align: center;
+}
 .sticky-cta {
   position: fixed;
   bottom: 0;

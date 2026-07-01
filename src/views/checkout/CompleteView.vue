@@ -6,40 +6,40 @@ import IconBase from '@/components/ds/IconBase.vue'
 import Button from '@/components/ds/Button.vue'
 import DepositInfoCard from '@/components/checkout/DepositInfoCard.vue'
 import { useOrderStore } from '@/stores/orders'
+import { statusLabel } from '@/stores/orders-helpers'
 
 const route = useRoute()
 const router = useRouter()
 const orders = useOrderStore()
 
-const orderId = computed(() => {
+const orderNumber = computed(() => {
   const v = route.query.order
   return typeof v === 'string' ? v : ''
 })
 
-const order = computed(() => (orderId.value ? orders.findById(orderId.value) : undefined))
+const order = computed(() => (orderNumber.value ? orders.findByNumber(orderNumber.value) : undefined))
 
-onBeforeMount(() => {
-  if (!order.value) {
-    router.replace('/')
-  }
+onBeforeMount(async () => {
+  if (!orderNumber.value) { router.replace('/'); return }
+  if (!order.value) await orders.fetchOrder(orderNumber.value)
+  if (!order.value) router.replace('/')
 })
 
-const isPending = computed(() => order.value?.status === '입금대기')
-const isRequested = computed(() => order.value?.status === '결제확인요청')
+const isPending = computed(() => order.value?.status === 'PENDING')
 const isApproved = computed(() => {
   const s = order.value?.status
-  return s === '결제완료' || s === '준비중' || s === '배송중' || s === '배송완료'
+  return s === 'PAID' || s === 'PREPARING' || s === 'SHIPPING' || s === 'DELIVERED'
 })
 
-const deliveryLabel = computed(() => (order.value?.deliveryMethod === 'direct' ? '직접 배송' : '화물택배'))
-const deliveryNote = computed(() =>
-  order.value?.deliveryMethod === 'direct'
-    ? '도착 1시간 전 연락드려요'
-    : '화물 도착 안내는 SMS로 발송돼요',
-)
+function shippingLabel(method?: string) {
+  if (method === 'DIRECT') return '직접 배송'
+  if (method === 'FREIGHT') return '화물택배'
+  return '택배'
+}
 
-function markPaid() {
-  if (order.value) orders.markPaymentRequested(order.value.id)
+function shippingNote(method?: string) {
+  if (method === 'DIRECT') return '도착 1시간 전 연락드려요'
+  return '배송 안내는 SMS로 발송돼요'
 }
 </script>
 
@@ -56,59 +56,46 @@ function markPaid() {
         <IconBase :name="isApproved ? 'check' : 'wallet'" :size="36" :stroke="2.6" />
       </div>
       <div class="hero__kicker">
-        {{ isApproved ? '결제가 확인됐어요' : isRequested ? '입금 확인 요청 접수됨' : '주문이 접수됐어요' }}
+        {{ isApproved ? '결제가 확인됐어요' : '주문이 접수됐어요' }}
       </div>
       <h1 class="hero__title">
         <template v-if="isApproved">새 주인을 만난 가전,<br />곧 도착할게요</template>
-        <template v-else-if="isRequested">운영자가 곧 확인합니다<br />잠시만 기다려 주세요</template>
         <template v-else>입금 후 배송이 시작됩니다</template>
       </h1>
       <div class="hero__order">
-        주문번호 <b class="hero__id">{{ order.id }}</b>
+        주문번호 <b class="hero__id">{{ order.orderNumber }}</b>
       </div>
     </main>
 
-    <!-- 입금 안내 카드 (입금 전) -->
+    <!-- 입금 안내 카드 (결제대기) -->
     <DepositInfoCard
       v-if="isPending"
-      :amount="order.total"
-      :order-id="order.id"
+      :amount="order.totalAmount"
+      :order-id="order.orderNumber"
     />
-
-    <!-- 입금 완료 클릭 후 안내 -->
-    <section v-else-if="isRequested" class="requested">
-      <div class="requested__head">
-        <IconBase name="check" :size="18" />
-        <span>입금 확인 요청이 접수됐어요</span>
-      </div>
-      <p class="requested__b">
-        운영자가 영업일 9~18시 기준 평균 2시간 내로 확인합니다.
-        승인이 완료되면 카톡/SMS로 알려드릴게요.
-      </p>
-    </section>
 
     <!-- 결제 정보 (요약) -->
     <section class="card">
       <div class="card__label">결제 정보</div>
       <div class="card__total">
         <span>총 결제 금액</span>
-        <span class="card__total-v">{{ won(order.total) }}</span>
+        <span class="card__total-v">{{ won(order.totalAmount) }}</span>
       </div>
       <div class="card__sub">
-        <span>{{ order.paymentMethodLabel }}</span>
-        <span>{{ order.status }}</span>
+        <span>{{ shippingLabel(order.shippingMethod) }}</span>
+        <span>{{ statusLabel(order.status) }}</span>
       </div>
 
       <template v-if="isApproved">
         <div class="card__divider" />
-        <div class="card__label">배송 일정</div>
+        <div class="card__label">배송 방식</div>
         <div class="sched">
           <div class="sched__icon">
             <IconBase name="truck" :size="20" />
           </div>
           <div>
-            <div class="sched__t">{{ order.estimatedDelivery }}</div>
-            <div class="sched__b">{{ deliveryLabel }} · {{ deliveryNote }}</div>
+            <div class="sched__t">{{ shippingLabel(order.shippingMethod) }}</div>
+            <div class="sched__b">{{ shippingNote(order.shippingMethod) }}</div>
           </div>
         </div>
       </template>
@@ -117,12 +104,12 @@ function markPaid() {
     <section class="card card--items">
       <div class="card__label">주문 상품 <span class="card__count">{{ order.items.length }}건</span></div>
       <ul class="items">
-        <li v-for="i in order.items" :key="i.productId" class="item">
-          <div class="item__brand">{{ i.brand }}</div>
-          <div class="item__title">{{ i.title }}</div>
+        <li v-for="i in order.items" :key="i.id" class="item">
+          <div v-if="i.brandSnapshot" class="item__brand">{{ i.brandSnapshot }}</div>
+          <div class="item__title">{{ i.titleSnapshot }}</div>
           <div class="item__foot">
-            <span>수량 {{ i.qty }}개</span>
-            <span class="item__price">{{ won(i.price * i.qty) }}</span>
+            <span>수량 {{ i.quantity }}개</span>
+            <span class="item__price">{{ won(i.subtotal) }}</span>
           </div>
         </li>
       </ul>
@@ -131,28 +118,17 @@ function markPaid() {
     <section class="card card--addr">
       <div class="card__label">배송지</div>
       <div class="addr">
-        <div class="addr__name">{{ order.address.recipient }} · {{ order.address.phone }}</div>
+        <div class="addr__name">{{ order.recipientName }} · {{ order.recipientPhone }}</div>
         <div class="addr__line">
-          ({{ order.address.zipcode }}) {{ order.address.address }}
-          {{ order.address.addressDetail }}
+          {{ order.address1 }}{{ order.address2 ? ' ' + order.address2 : '' }}
         </div>
-        <div v-if="order.address.memo" class="addr__memo">메모 · {{ order.address.memo }}</div>
+        <div v-if="order.memo" class="addr__memo">메모 · {{ order.memo }}</div>
       </div>
     </section>
 
-    <!-- 입금 완료 했어요 버튼 (입금대기 상태에만) -->
-    <div v-if="isPending" class="paid-cta">
-      <Button variant="accent" size="lg" full @click="markPaid">
-        입금 완료했어요
-      </Button>
-      <p class="paid-cta__note">
-        입금 후 이 버튼을 눌러주시면 운영자가 더 빨리 확인해요.
-      </p>
-    </div>
-
     <div class="cta">
       <RouterLink to="/" class="cta__btn cta__btn--secondary">홈으로</RouterLink>
-      <RouterLink :to="`/my/orders/${order.id}`" class="cta__btn cta__btn--primary">
+      <RouterLink :to="`/my/orders/${order.orderNumber}`" class="cta__btn cta__btn--primary">
         주문 상세보기
       </RouterLink>
     </div>

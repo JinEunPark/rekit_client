@@ -1,37 +1,71 @@
 <script setup lang="ts">
-import { computed, onBeforeMount } from 'vue'
+import { computed, onBeforeMount, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
-import DepositInfoCard from '@/components/checkout/DepositInfoCard.vue'
 import { useOrderStore, type OrderStatus } from '@/stores/orders'
-import { isAwaitingDeposit, statusTone } from '@/stores/orders-helpers'
+import { statusLabel, statusTone } from '@/stores/orders-helpers'
 
 const route = useRoute()
 const router = useRouter()
 const orders = useOrderStore()
 
-const orderId = computed(() => route.params.id as string)
-const order = computed(() => orders.findById(orderId.value))
+const orderNumber = computed(() => route.params.id as string)
+const order = computed(() => orders.findByNumber(orderNumber.value))
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
+  if (!order.value) {
+    await orders.fetchOrder(orderNumber.value)
+  }
   if (!order.value) router.replace('/my/orders')
 })
 
-const STATUS_FLOW: OrderStatus[] = ['입금대기', '결제완료', '준비중', '배송중', '배송완료']
+const STATUS_FLOW: OrderStatus[] = ['PENDING', 'PAID', 'PREPARING', 'SHIPPING', 'DELIVERED']
+const STATUS_FLOW_LABELS = ['결제대기', '결제완료', '준비중', '배송중', '배송완료']
+
 const currentStepIdx = computed(() => {
   if (!order.value) return -1
-  // 결제확인요청 is collapsed into the 입금대기 step from the buyer's perspective
-  if (order.value.status === '결제확인요청') return 0
   return STATUS_FLOW.indexOf(order.value.status)
 })
 
-const awaitingDeposit = computed(() => !!order.value && isAwaitingDeposit(order.value.status))
+const cancelling = ref(false)
+const cancelError = ref('')
 
-function markPaid() {
-  if (order.value) orders.markPaymentRequested(order.value.id)
+async function cancelOrder() {
+  if (!order.value) return
+  cancelling.value = true
+  cancelError.value = ''
+  try {
+    await orders.cancel(order.value.orderNumber)
+  } catch {
+    cancelError.value = '취소 처리 중 오류가 발생했어요.'
+  } finally {
+    cancelling.value = false
+  }
+}
+
+const refunding = ref(false)
+const refundError = ref('')
+
+async function requestRefund() {
+  if (!order.value) return
+  refunding.value = true
+  refundError.value = ''
+  try {
+    await orders.refund(order.value.orderNumber)
+  } catch {
+    refundError.value = '환불 신청 중 오류가 발생했어요.'
+  } finally {
+    refunding.value = false
+  }
+}
+
+function shippingLabel(method: string) {
+  if (method === 'DIRECT') return '직접배송'
+  if (method === 'FREIGHT') return '화물택배'
+  return '택배'
 }
 
 function formatDate(iso: string) {
@@ -47,24 +81,20 @@ function formatDate(iso: string) {
       <RouterLink to="/my/orders" class="head__back">
         <IconBase name="chevronLeft" :size="18" /> 주문 내역
       </RouterLink>
-      <div class="head__id">{{ order.id }}</div>
+      <div class="head__id">{{ order.orderNumber }}</div>
     </header>
 
     <!-- Status -->
     <section class="status">
       <div class="status__top">
         <Badge :tone="statusTone(order.status)" size="md" :style="{ fontWeight: '700' }">
-          {{ order.status }}
+          {{ statusLabel(order.status) }}
         </Badge>
         <div class="status__when">{{ formatDate(order.createdAt) }}</div>
       </div>
-      <div class="status__eta">
-        <IconBase name="truck" :size="16" />
-        <span>{{ order.estimatedDelivery }} 도착 예정</span>
-      </div>
 
-      <!-- Step bar (skip if cancelled) -->
-      <div v-if="order.status !== '취소'" class="steps">
+      <!-- Step bar (skip if cancelled or refunded) -->
+      <div v-if="order.status !== 'CANCELLED' && order.status !== 'REFUNDED'" class="steps">
         <template v-for="(s, i) in STATUS_FLOW" :key="s">
           <div
             class="step"
@@ -76,7 +106,7 @@ function formatDate(iso: string) {
             <div class="step__dot">
               <IconBase v-if="i < currentStepIdx" name="check" :size="12" :stroke="2.6" />
             </div>
-            <span class="step__label">{{ s }}</span>
+            <span class="step__label">{{ STATUS_FLOW_LABELS[i] }}</span>
           </div>
           <div
             v-if="i < STATUS_FLOW.length - 1"
@@ -87,35 +117,21 @@ function formatDate(iso: string) {
       </div>
     </section>
 
-    <!-- Deposit info (입금대기 / 결제확인요청) -->
-    <template v-if="awaitingDeposit">
-      <DepositInfoCard :amount="order.total" :order-id="order.id" />
-      <div v-if="order.status === '입금대기'" class="paid-cta">
-        <Button variant="accent" size="lg" full @click="markPaid">
-          입금 완료했어요
-        </Button>
-      </div>
-      <div v-else class="requested">
-        <IconBase name="check" :size="16" />
-        <span>입금 확인 요청이 접수됐어요. 운영자가 곧 확인합니다.</span>
-      </div>
-    </template>
-
     <!-- Items -->
     <section class="block">
       <h2 class="block__title">주문 상품 <span class="block__count">{{ order.items.length }}건</span></h2>
       <ul class="items">
-        <li v-for="i in order.items" :key="i.productId" class="item">
+        <li v-for="i in order.items" :key="i.id" class="item">
           <div class="item__head">
-            <RouterLink :to="`/products/${i.productId}`" class="item__brand">{{ i.brand }}</RouterLink>
+            <RouterLink v-if="i.brandSnapshot" :to="`/products/${i.productId}`" class="item__brand">{{ i.brandSnapshot }}</RouterLink>
             <RouterLink :to="`/products/${i.productId}`" class="item__more">
               상품 보기 <IconBase name="chevronRight" :size="12" />
             </RouterLink>
           </div>
-          <RouterLink :to="`/products/${i.productId}`" class="item__title">{{ i.title }}</RouterLink>
+          <RouterLink :to="`/products/${i.productId}`" class="item__title">{{ i.titleSnapshot }}</RouterLink>
           <div class="item__foot">
-            <span>수량 {{ i.qty }}개</span>
-            <span class="item__price">{{ won(i.price * i.qty) }}</span>
+            <span>수량 {{ i.quantity }}개</span>
+            <span class="item__price">{{ won(i.priceSnapshot * i.quantity) }}</span>
           </div>
         </li>
       </ul>
@@ -125,12 +141,12 @@ function formatDate(iso: string) {
     <section class="block">
       <h2 class="block__title">배송지</h2>
       <div class="addr">
-        <div class="addr__name">{{ order.address.recipient }}</div>
-        <div class="addr__line">{{ order.address.phone }}</div>
+        <div class="addr__name">{{ order.recipientName }}</div>
+        <div class="addr__line">{{ order.recipientPhone }}</div>
         <div class="addr__line">
-          ({{ order.address.zipcode }}) {{ order.address.address }} {{ order.address.addressDetail }}
+          {{ order.address1 }}{{ order.address2 ? ' ' + order.address2 : '' }}
         </div>
-        <div v-if="order.address.memo" class="addr__memo">메모 · {{ order.address.memo }}</div>
+        <div v-if="order.memo" class="addr__memo">메모 · {{ order.memo }}</div>
       </div>
     </section>
 
@@ -139,34 +155,46 @@ function formatDate(iso: string) {
       <h2 class="block__title">결제 정보</h2>
       <dl class="pay">
         <div class="pay__row">
-          <dt>결제 수단</dt>
-          <dd>{{ order.paymentMethodLabel }}</dd>
-        </div>
-        <div class="pay__row">
           <dt>상품 금액</dt>
-          <dd>{{ won(order.itemsTotal) }}</dd>
+          <dd>{{ won(order.items.reduce((s, i) => s + i.subtotal, 0)) }}</dd>
         </div>
         <div class="pay__row">
-          <dt>배송비 ({{ order.deliveryMethod === 'direct' ? '직접배송' : '화물택배' }})</dt>
+          <dt>배송비 ({{ shippingLabel(order.shippingMethod) }})</dt>
           <dd>+ {{ won(order.shippingFee) }}</dd>
         </div>
         <div class="pay__total">
           <span>최종 결제 금액</span>
-          <span>{{ won(order.total) }}</span>
+          <span>{{ won(order.totalAmount) }}</span>
         </div>
       </dl>
     </section>
 
     <!-- Actions -->
     <div class="cta">
-      <Button variant="secondary" size="lg" :style="{ flex: '1' }">배송조회</Button>
-      <Button
-        variant="secondary"
-        size="lg"
-        :style="{ flex: '1', color: 'var(--rekit-danger)', borderColor: 'var(--rekit-border)' }"
-      >
-        환불 신청
-      </Button>
+      <template v-if="order.status === 'PENDING'">
+        <Button
+          variant="secondary"
+          size="lg"
+          :style="{ flex: '1', color: 'var(--rekit-danger)', borderColor: 'var(--rekit-border)' }"
+          :disabled="cancelling"
+          @click="cancelOrder"
+        >
+          {{ cancelling ? '취소 중…' : '주문취소' }}
+        </Button>
+        <p v-if="cancelError" class="cta__error">{{ cancelError }}</p>
+      </template>
+      <template v-else-if="order.status === 'DELIVERED'">
+        <Button
+          variant="secondary"
+          size="lg"
+          :style="{ flex: '1', color: 'var(--rekit-danger)', borderColor: 'var(--rekit-border)' }"
+          :disabled="refunding"
+          @click="requestRefund"
+        >
+          {{ refunding ? '신청 중…' : '환불신청' }}
+        </Button>
+        <p v-if="refundError" class="cta__error">{{ refundError }}</p>
+      </template>
     </div>
   </div>
 </template>

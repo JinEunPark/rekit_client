@@ -1,123 +1,146 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { useAuthStore } from './auth'
+import {
+  listOrders,
+  getOrder,
+  createOrder,
+  cancelOrder as apiCancelOrder,
+  requestRefund as apiRequestRefund,
+  type OrderResponse,
+  type CreateOrderRequest,
+} from '@/api/orders'
 
-export type DeliveryMethod = 'direct' | 'cargo'
-export type PaymentMethod = 'bank'
-export type OrderStatus = '입금대기' | '결제확인요청' | '결제완료' | '준비중' | '배송중' | '배송완료' | '취소'
+export type { OrderStatus, ShipmentMethod } from '@/api/orders'
 
-export interface OrderAddress {
-  recipient: string
-  phone: string
-  zipcode: string
-  address: string
-  addressDetail: string
-  memo?: string
-}
-
-export interface OrderLineItem {
-  productId: string
-  qty: number
-  /** Unit price snapshot — stored so historical orders aren't affected by later price changes. */
-  price: number
-  title: string
-  brand: string
+export interface OrderItem {
+  id: number
+  productId: number
+  titleSnapshot: string
+  brandSnapshot: string | null
+  imageUrlSnapshot: string | null
+  priceSnapshot: number
+  quantity: number
+  subtotal: number
 }
 
 export interface Order {
-  id: string
-  createdAt: string
-  items: OrderLineItem[]
-  itemsTotal: number
+  orderNumber: string
+  status: import('@/api/orders').OrderStatus
+  totalAmount: number
   shippingFee: number
-  total: number
-  deliveryMethod: DeliveryMethod
-  paymentMethod: PaymentMethod
-  /** Display label for the chosen payment method (e.g. '신용카드 · 신한 1234'). PG decides this. */
-  paymentMethodLabel: string
-  address: OrderAddress
-  status: OrderStatus
-  estimatedDelivery: string
+  discountAmount: number
+  shippingMethod: import('@/api/orders').ShipmentMethod
+  recipientName: string
+  recipientPhone: string
+  address1: string
+  address2: string | null
+  memo: string | null
+  items: OrderItem[]
+  paidAt: string | null
+  cancelledAt: string | null
+  createdAt: string
 }
 
-const ORDERS_KEY = 'rekit.orders.v1'
-
-function loadOrders(): Order[] {
-  if (typeof localStorage === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(ORDERS_KEY)
-    return raw ? (JSON.parse(raw) as Order[]) : []
-  } catch {
-    return []
+function fromServer(r: OrderResponse): Order {
+  return {
+    orderNumber: r.order_number,
+    status: r.status,
+    totalAmount: r.total_amount,
+    shippingFee: r.shipping_fee,
+    discountAmount: r.discount_amount,
+    shippingMethod: r.shipping_method,
+    recipientName: r.recipient_name,
+    recipientPhone: r.recipient_phone,
+    address1: r.address1,
+    address2: r.address2,
+    memo: r.memo,
+    items: r.items.map((i) => ({
+      id: i.id,
+      productId: i.product_id,
+      titleSnapshot: i.product_title_snapshot,
+      brandSnapshot: i.product_brand_snapshot,
+      imageUrlSnapshot: i.product_image_url_snapshot,
+      priceSnapshot: i.price_snapshot,
+      quantity: i.quantity,
+      subtotal: i.subtotal,
+    })),
+    paidAt: r.paid_at,
+    cancelledAt: r.cancelled_at,
+    createdAt: r.created_at,
   }
-}
-
-function generateOrderId(): string {
-  const now = new Date()
-  const yy = String(now.getFullYear() % 100).padStart(2, '0')
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const seq = String(Math.floor(Math.random() * 9000) + 1000)
-  return `RK-${yy}${mm}${dd}${seq}`
-}
-
-function estimateDelivery(method: DeliveryMethod): string {
-  const today = new Date()
-  const minDays = method === 'direct' ? 1 : 2
-  const maxDays = method === 'direct' ? 2 : 4
-  const start = new Date(today.getTime() + minDays * 86_400_000)
-  const end = new Date(today.getTime() + maxDays * 86_400_000)
-  const days = '일월화수목금토'
-  const fmt = (d: Date) =>
-    `${d.getMonth() + 1}월 ${d.getDate()}일(${days[d.getDay()]})`
-  return `${fmt(start)} ~ ${fmt(end)}`
 }
 
 export const useOrderStore = defineStore('orders', () => {
-  const orders = ref<Order[]>(loadOrders())
+  const auth = useAuthStore()
+  const orders = ref<Order[]>([])
+  const total = ref(0)
+  const loading = ref(false)
 
   watch(
-    orders,
-    (val) => {
-      if (typeof localStorage === 'undefined') return
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(val))
+    () => auth.isAuthenticated,
+    (loggedIn, wasLoggedIn) => {
+      if (loggedIn && !wasLoggedIn) void loadFromServer()
+      else if (!loggedIn && wasLoggedIn) {
+        orders.value = []
+        total.value = 0
+      }
     },
-    { deep: true },
   )
 
-  function create(
-    input: Omit<Order, 'id' | 'createdAt' | 'status' | 'estimatedDelivery'>,
-  ): Order {
-    const order: Order = {
-      ...input,
-      id: generateOrderId(),
-      createdAt: new Date().toISOString(),
-      status: '입금대기',
-      estimatedDelivery: estimateDelivery(input.deliveryMethod),
+  if (typeof window !== 'undefined' && auth.isAuthenticated) void loadFromServer()
+
+  async function loadFromServer(page = 1) {
+    loading.value = true
+    try {
+      const res = await listOrders(page)
+      orders.value = page === 1
+        ? res.items.map(fromServer)
+        : [...orders.value, ...res.items.map(fromServer)]
+      total.value = res.meta.total
+    } catch {
+      // 서버 오류 시 현재 상태 유지
+    } finally {
+      loading.value = false
     }
-    orders.value = [order, ...orders.value]
+  }
+
+  async function fetchOrder(orderNumber: string): Promise<Order | null> {
+    try {
+      const res = await getOrder(orderNumber)
+      const order = fromServer(res)
+      const idx = orders.value.findIndex((o) => o.orderNumber === orderNumber)
+      if (idx !== -1) orders.value[idx] = order
+      else orders.value.unshift(order)
+      return order
+    } catch {
+      return null
+    }
+  }
+
+  function findByNumber(orderNumber: string): Order | undefined {
+    return orders.value.find((o) => o.orderNumber === orderNumber)
+  }
+
+  async function create(input: CreateOrderRequest): Promise<Order> {
+    const res = await createOrder(input)
+    const order = fromServer(res)
+    orders.value.unshift(order)
+    total.value++
     return order
   }
 
-  function findById(id: string): Order | undefined {
-    return orders.value.find((o) => o.id === id)
+  async function cancel(orderNumber: string): Promise<void> {
+    const res = await apiCancelOrder(orderNumber)
+    const updated = fromServer(res)
+    const idx = orders.value.findIndex((o) => o.orderNumber === orderNumber)
+    if (idx !== -1) orders.value[idx] = updated
   }
 
-  function setStatus(id: string, status: OrderStatus): void {
-    const o = orders.value.find((x) => x.id === id)
-    if (o) o.status = status
+  async function refund(orderNumber: string): Promise<void> {
+    await apiRequestRefund(orderNumber)
+    void loadFromServer()
   }
 
-  function markPaymentRequested(id: string): void {
-    const o = orders.value.find((x) => x.id === id)
-    if (o && o.status === '입금대기') o.status = '결제확인요청'
-  }
-
-  function approvePayment(id: string): void {
-    const o = orders.value.find((x) => x.id === id)
-    if (o && (o.status === '입금대기' || o.status === '결제확인요청')) {
-      o.status = '결제완료'
-    }
-  }
-
-  return { orders, create, findById, setStatus, markPaymentRequested, approvePayment }
+  return { orders, total, loading, loadFromServer, fetchOrder, findByNumber, create, cancel, refund }
 })
