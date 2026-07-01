@@ -84,6 +84,25 @@ const address = ref<OrderAddress>({
   memo: saved?.memo ?? '',
 })
 
+const selectedAddrId = ref<string | null>(saved?.id ?? null)
+
+function selectSavedAddr(a: Address) {
+  selectedAddrId.value = a.id
+  address.value = {
+    recipient: a.recipient,
+    phone: a.phone,
+    zipcode: a.zipcode,
+    address: a.address,
+    addressDetail: a.addressDetail ?? '',
+    memo: a.memo ?? '',
+  }
+}
+
+function clearAddrSelection() {
+  selectedAddrId.value = null
+  address.value = { recipient: '', phone: '', zipcode: '', address: '', addressDetail: '', memo: '' }
+}
+
 /* ────────────── Delivery ────────────── */
 
 const deliveryMethod = ref<DeliveryMethod>('direct')
@@ -155,22 +174,26 @@ async function pay() {
   try {
     // 1. 배송지 저장 → address_id 확보
     let addressId: number | null = null
-    if (addresses.defaultAddress) {
-      await addresses.update(addresses.defaultAddress.id, {
-        recipient: address.value.recipient,
-        phone: address.value.phone,
-        zipcode: address.value.zipcode,
-        address: address.value.address,
-        addressDetail: address.value.addressDetail,
-        memo: address.value.memo,
-      })
-      addressId = toNumId(addresses.defaultAddress.id)
-    } else {
+    const addrPatch = {
+      recipient: address.value.recipient,
+      phone: address.value.phone,
+      zipcode: address.value.zipcode,
+      address: address.value.address,
+      addressDetail: address.value.addressDetail,
+      memo: address.value.memo,
+    }
+
+    if (selectedAddrId.value) {
+      await addresses.update(selectedAddrId.value, addrPatch)
+      addressId = toNumId(selectedAddrId.value)
+    }
+
+    if (!addressId) {
       await addresses.add({ ...address.value, label: '기본 배송지', isDefault: true })
-      // TypeScript narrows defaultAddress to null in this else-branch; cast to re-evaluate
       const freshDefault = addresses.defaultAddress as Address | null
       addressId = freshDefault ? toNumId(freshDefault.id) : null
     }
+
     if (!addressId) throw new Error('배송지 저장에 실패했어요.')
 
     // 2. 주문 생성
@@ -216,6 +239,35 @@ async function pay() {
       <!-- Address -->
       <section class="block">
         <h2 class="block__title">배송지</h2>
+
+        <!-- Saved address picker -->
+        <div v-if="addresses.addresses.length > 0" class="addr-picker">
+          <button
+            v-for="a in addresses.addresses"
+            :key="a.id"
+            type="button"
+            class="addr-chip"
+            :class="{ 'addr-chip--on': selectedAddrId === a.id }"
+            @click="selectSavedAddr(a)"
+          >
+            <span class="addr-chip__top">
+              <span class="addr-chip__label">{{ a.label }}</span>
+              <span v-if="a.isDefault" class="addr-chip__default">기본</span>
+            </span>
+            <span class="addr-chip__name">{{ a.recipient }}</span>
+            <span class="addr-chip__addr">{{ a.address }}{{ a.addressDetail ? ' ' + a.addressDetail : '' }}</span>
+          </button>
+          <button
+            type="button"
+            class="addr-chip addr-chip--new"
+            :class="{ 'addr-chip--on': !selectedAddrId }"
+            @click="clearAddrSelection"
+          >
+            <span class="addr-chip__new-icon">+</span>
+            <span>새 주소 입력</span>
+          </button>
+        </div>
+
         <div class="address">
           <div class="row row--2">
             <label class="field" :class="{ 'field--err': errors.recipient }">
@@ -436,6 +488,88 @@ async function pay() {
   color: var(--rekit-ink-subtle);
   font-weight: 600;
   font-family: var(--rekit-font-mono);
+}
+
+/* saved address picker */
+.addr-picker {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+  margin-bottom: 14px;
+}
+.addr-picker::-webkit-scrollbar { display: none; }
+.addr-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  min-width: 120px;
+  max-width: 180px;
+  background: var(--rekit-surface);
+  border: 1.5px solid var(--rekit-border);
+  border-radius: 12px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.addr-chip:hover {
+  border-color: var(--rekit-ink-muted);
+}
+.addr-chip--on {
+  border-color: var(--rekit-ink);
+  background: var(--rekit-surface-muted);
+}
+.addr-chip__top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.addr-chip__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rekit-ink-muted);
+}
+.addr-chip__default {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--rekit-accent-deep);
+  background: var(--rekit-accent-soft);
+  padding: 1px 5px;
+  border-radius: 6px;
+}
+.addr-chip__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rekit-ink);
+}
+.addr-chip__addr {
+  font-size: 11px;
+  color: var(--rekit-ink-subtle);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 156px;
+}
+.addr-chip--new {
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 6px;
+  color: var(--rekit-ink-muted);
+  font-weight: 600;
+}
+.addr-chip--new.addr-chip--on {
+  color: var(--rekit-ink);
+}
+.addr-chip__new-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--rekit-ink-muted);
 }
 
 /* address */
