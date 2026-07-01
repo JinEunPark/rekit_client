@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeMount, ref, type ComponentPublicInstance } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeMount, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
@@ -14,19 +14,9 @@ import type { Product } from '@/data/products'
 import { useOrderStore } from '@/stores/orders'
 import type { ShipmentMethod } from '@/api/orders'
 import { toNumId } from '@/stores/utils'
+import { useAddressStore } from '@/stores/addresses'
 
 type DeliveryMethod = 'direct' | 'cargo'
-
-interface OrderAddress {
-  recipient: string
-  phone: string
-  zipcode: string
-  address: string
-  addressDetail: string
-  memo?: string
-}
-import { useAddressStore, type Address } from '@/stores/addresses'
-import { useKakaoPostcode } from '@/composables/useKakaoPostcode'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -34,7 +24,6 @@ const cart = useCartStore()
 const productStore = useProductStore()
 const orders = useOrderStore()
 const addresses = useAddressStore()
-const { searching: searchingZip, sdkLoading: zipLoading, container: zipContainer, openSearch } = useKakaoPostcode()
 
 interface Snapshot {
   productId: string
@@ -74,34 +63,12 @@ onBeforeMount(() => {
 
 /* ────────────── Address ────────────── */
 
-const saved = addresses.defaultAddress
-const address = ref<OrderAddress>({
-  recipient: saved?.recipient ?? auth.user?.username ?? '',
-  phone: saved?.phone ?? auth.user?.phone ?? '',
-  zipcode: saved?.zipcode ?? '',
-  address: saved?.address ?? '',
-  addressDetail: saved?.addressDetail ?? '',
-  memo: saved?.memo ?? '',
-})
-
-const selectedAddrId = ref<string | null>(saved?.id ?? null)
-
-function selectSavedAddr(a: Address) {
-  selectedAddrId.value = a.id
-  address.value = {
-    recipient: a.recipient,
-    phone: a.phone,
-    zipcode: a.zipcode,
-    address: a.address,
-    addressDetail: a.addressDetail ?? '',
-    memo: a.memo ?? '',
-  }
-}
-
-function clearAddrSelection() {
-  selectedAddrId.value = null
-  address.value = { recipient: '', phone: '', zipcode: '', address: '', addressDetail: '', memo: '' }
-}
+const selectedAddrId = ref<string | null>(addresses.defaultAddress?.id ?? null)
+const selectedAddr = computed(() =>
+  selectedAddrId.value
+    ? (addresses.addresses.find((a) => a.id === selectedAddrId.value) ?? null)
+    : null,
+)
 
 /* ────────────── Delivery ────────────── */
 
@@ -128,43 +95,16 @@ const finalTotal = computed(() => itemsTotal.value + shippingFee.value)
 
 /* ────────────── Validation ────────────── */
 
-const submitted = ref(false)
-const phoneValid = computed(() => /^\d{2,3}-?\d{3,4}-?\d{4}$/.test(address.value.phone.trim()))
-const errors = computed(() => ({
-  recipient: submitted.value && !address.value.recipient.trim(),
-  phone: submitted.value && !phoneValid.value,
-  zipcode: submitted.value && !address.value.zipcode.trim(),
-  address: submitted.value && !address.value.address.trim(),
-}))
-
-const formValid = computed(
-  () =>
-    address.value.recipient.trim() &&
-    phoneValid.value &&
-    address.value.zipcode.trim() &&
-    address.value.address.trim(),
-)
+const formValid = computed(() => !!selectedAddrId.value && toNumId(selectedAddrId.value) !== null)
 
 /* ────────────── Submit ────────────── */
 
 const paying = ref(false)
 const payError = ref('')
 
-function bindZipContainer(el: Element | ComponentPublicInstance | null) {
-  zipContainer.value = el instanceof HTMLElement ? el : null
-}
-
-async function openZipSearch() {
-  await openSearch((result) => {
-    address.value.zipcode = result.zipcode
-    address.value.address = result.address
-  })
-}
-
 async function pay() {
-  submitted.value = true
   if (!formValid.value) {
-    document.querySelector<HTMLElement>('.form input[aria-invalid="true"]')?.focus()
+    payError.value = '배송지를 선택해 주세요.'
     return
   }
 
@@ -172,31 +112,8 @@ async function pay() {
   payError.value = ''
 
   try {
-    // 1. 배송지 저장 → address_id 확보
-    let addressId: number | null = null
-    const addrPatch = {
-      recipient: address.value.recipient,
-      phone: address.value.phone,
-      zipcode: address.value.zipcode,
-      address: address.value.address,
-      addressDetail: address.value.addressDetail,
-      memo: address.value.memo,
-    }
+    const addressId = toNumId(selectedAddrId.value!)!
 
-    if (selectedAddrId.value) {
-      await addresses.update(selectedAddrId.value, addrPatch)
-      addressId = toNumId(selectedAddrId.value)
-    }
-
-    if (!addressId) {
-      await addresses.add({ ...address.value, label: '기본 배송지', isDefault: true })
-      const freshDefault = addresses.defaultAddress as Address | null
-      addressId = freshDefault ? toNumId(freshDefault.id) : null
-    }
-
-    if (!addressId) throw new Error('배송지 저장에 실패했어요.')
-
-    // 2. 주문 생성
     const shippingMethod: ShipmentMethod =
       deliveryMethod.value === 'direct' ? 'DIRECT'
       : deliveryMethod.value === 'cargo' ? 'FREIGHT'
@@ -209,12 +126,10 @@ async function pay() {
       })),
       address_id: addressId,
       shipping_method: shippingMethod,
-      memo: address.value.memo || null,
+      memo: selectedAddr.value?.memo || null,
     })
 
-    // 3. 장바구니에서 주문 상품 제거
     snapshot.value.forEach((s) => cart.remove(s.productId))
-
     router.replace(`/checkout/complete?order=${order.orderNumber}`)
   } catch {
     payError.value = '주문 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
@@ -238,108 +153,41 @@ async function pay() {
     <form class="form" novalidate @submit.prevent="pay">
       <!-- Address -->
       <section class="block">
-        <h2 class="block__title">배송지</h2>
+        <div class="block__head">
+          <h2 class="block__title">배송지</h2>
+          <RouterLink to="/my/addresses" class="block__manage">배송지 관리</RouterLink>
+        </div>
 
-        <!-- Saved address picker -->
-        <div v-if="addresses.addresses.length > 0" class="addr-picker">
+        <!-- No saved addresses -->
+        <div v-if="addresses.addresses.length === 0" class="addr-empty">
+          <IconBase name="map" :size="20" />
+          <p>저장된 배송지가 없어요.</p>
+          <RouterLink to="/my/addresses" class="addr-empty__link">배송지 추가하기 →</RouterLink>
+        </div>
+
+        <!-- Address chips -->
+        <div v-else class="addr-picker">
           <button
             v-for="a in addresses.addresses"
             :key="a.id"
             type="button"
             class="addr-chip"
             :class="{ 'addr-chip--on': selectedAddrId === a.id }"
-            @click="selectSavedAddr(a)"
+            @click="selectedAddrId = a.id"
           >
             <span class="addr-chip__top">
               <span class="addr-chip__label">{{ a.label }}</span>
               <span v-if="a.isDefault" class="addr-chip__default">기본</span>
             </span>
             <span class="addr-chip__name">{{ a.recipient }}</span>
-            <span class="addr-chip__addr">{{ a.address }}{{ a.addressDetail ? ' ' + a.addressDetail : '' }}</span>
-          </button>
-          <button
-            type="button"
-            class="addr-chip addr-chip--new"
-            :class="{ 'addr-chip--on': !selectedAddrId }"
-            @click="clearAddrSelection"
-          >
-            <span class="addr-chip__new-icon">+</span>
-            <span>새 주소 입력</span>
           </button>
         </div>
 
-        <div class="address">
-          <div class="row row--2">
-            <label class="field" :class="{ 'field--err': errors.recipient }">
-              <span class="field__label">받는 사람</span>
-              <input
-                v-model="address.recipient"
-                type="text"
-                placeholder="이름"
-                :aria-invalid="errors.recipient"
-              />
-            </label>
-            <label class="field" :class="{ 'field--err': errors.phone }">
-              <span class="field__label">휴대폰</span>
-              <input
-                v-model="address.phone"
-                type="tel"
-                inputmode="numeric"
-                autocomplete="tel"
-                placeholder="010-1234-5678"
-                :aria-invalid="errors.phone"
-              />
-            </label>
-          </div>
-          <div v-if="searchingZip" class="zip-embed">
-            <div class="zip-embed__frame-wrap">
-              <div :ref="bindZipContainer" class="zip-embed__frame" />
-              <div v-if="zipLoading" class="zip-embed__loading">
-                <span class="zip-embed__spinner" />
-              </div>
-            </div>
-            <button type="button" class="zip-embed__cancel" @click="searchingZip = false">취소</button>
-          </div>
-          <template v-else>
-            <div class="row row--zip">
-              <label class="field field--zip" :class="{ 'field--err': errors.zipcode }">
-                <span class="field__label">우편번호</span>
-                <input
-                  v-model="address.zipcode"
-                  type="text"
-                  inputmode="numeric"
-                  placeholder="04101"
-                  :aria-invalid="errors.zipcode"
-                />
-              </label>
-              <button type="button" class="zip-btn" @click="openZipSearch">주소 검색</button>
-            </div>
-            <label class="field" :class="{ 'field--err': errors.address }">
-              <span class="field__label">주소</span>
-              <input
-                v-model="address.address"
-                type="text"
-                placeholder="도로명 주소"
-                :aria-invalid="errors.address"
-              />
-            </label>
-          </template>
-          <label class="field">
-            <span class="field__label">상세 주소</span>
-            <input
-              v-model="address.addressDetail"
-              type="text"
-              placeholder="동·호수 등 (선택)"
-            />
-          </label>
-          <label class="field">
-            <span class="field__label">배송 메모</span>
-            <input
-              v-model="address.memo"
-              type="text"
-              placeholder="예: 부재 시 경비실에 맡겨주세요 (선택)"
-            />
-          </label>
+        <!-- Selected address card -->
+        <div v-if="selectedAddr" class="addr-card">
+          <div class="addr-card__name">{{ selectedAddr.recipient }} · {{ selectedAddr.phone }}</div>
+          <div class="addr-card__line">{{ selectedAddr.address }}{{ selectedAddr.addressDetail ? ' ' + selectedAddr.addressDetail : '' }}</div>
+          <div v-if="selectedAddr.memo" class="addr-card__memo">메모 · {{ selectedAddr.memo }}</div>
         </div>
       </section>
 
@@ -476,11 +324,26 @@ async function pay() {
   gap: 28px;
 }
 
+.block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
 .block__title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
+}
+.block__manage {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+  text-decoration: none;
+}
+.block__manage:hover {
+  color: var(--rekit-ink);
 }
 .block__count {
   margin-left: 6px;
@@ -490,14 +353,34 @@ async function pay() {
   font-family: var(--rekit-font-mono);
 }
 
-/* saved address picker */
+/* address: no addresses */
+.addr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 0;
+  color: var(--rekit-ink-subtle);
+  font-size: 13.5px;
+}
+.addr-empty p { margin: 0; }
+.addr-empty__link {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rekit-ink);
+  text-decoration: none;
+}
+.addr-empty__link:hover { text-decoration: underline; }
+
+/* address chips */
 .addr-picker {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 2px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .addr-picker::-webkit-scrollbar { display: none; }
 .addr-chip {
@@ -506,20 +389,15 @@ async function pay() {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 10px 12px;
-  min-width: 120px;
-  max-width: 180px;
+  padding: 10px 14px;
   background: var(--rekit-surface);
   border: 1.5px solid var(--rekit-border);
   border-radius: 12px;
-  font-size: 12px;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
 }
-.addr-chip:hover {
-  border-color: var(--rekit-ink-muted);
-}
+.addr-chip:hover { border-color: var(--rekit-ink-muted); }
 .addr-chip--on {
   border-color: var(--rekit-ink);
   background: var(--rekit-surface-muted);
@@ -547,150 +425,29 @@ async function pay() {
   font-weight: 700;
   color: var(--rekit-ink);
 }
-.addr-chip__addr {
-  font-size: 11px;
-  color: var(--rekit-ink-subtle);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 156px;
-}
-.addr-chip--new {
-  align-items: center;
-  justify-content: center;
-  flex-direction: row;
-  gap: 6px;
-  color: var(--rekit-ink-muted);
-  font-weight: 600;
-}
-.addr-chip--new.addr-chip--on {
-  color: var(--rekit-ink);
-}
-.addr-chip__new-icon {
-  font-size: 18px;
-  line-height: 1;
-  color: var(--rekit-ink-muted);
-}
 
-/* address */
-.address {
+/* selected address card */
+.addr-card {
+  padding: 14px 16px;
+  background: var(--rekit-surface-muted);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
 }
-.row {
-  display: grid;
-  gap: 10px;
+.addr-card__name {
+  font-size: 13.5px;
+  font-weight: 700;
 }
-.row--2 {
-  grid-template-columns: 1fr 1fr;
-}
-.row--zip {
-  grid-template-columns: 1fr auto;
-  align-items: end;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.field__label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--rekit-ink-muted);
-}
-.field input {
-  width: 100%;
-  height: 48px;
-  padding: 0 14px;
-  background: var(--rekit-surface);
-  border: 1px solid var(--rekit-border);
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
-  color: var(--rekit-ink);
-  letter-spacing: -0.01em;
-  outline: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
-}
-.field input:focus {
-  border-color: var(--rekit-ink);
-  box-shadow: 0 0 0 3px rgba(26, 26, 23, 0.06);
-}
-.field input::placeholder {
-  color: var(--rekit-ink-placeholder);
-}
-.field--err input {
-  border-color: var(--rekit-danger);
-}
-.field--err input:focus {
-  box-shadow: 0 0 0 3px rgba(210, 78, 78, 0.12);
-}
-.zip-btn {
-  height: 48px;
-  padding: 0 16px;
-  background: var(--rekit-surface);
-  border: 1px solid var(--rekit-border);
-  border-radius: 10px;
+.addr-card__line {
   font-size: 13px;
-  font-weight: 600;
   color: var(--rekit-ink-muted);
-  white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  line-height: 1.5;
 }
-.zip-btn:hover {
-  background: var(--rekit-surface-muted);
-  color: var(--rekit-ink);
-}
-.zip-embed {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.zip-embed__frame-wrap {
-  position: relative;
-  height: 400px;
-  border: 1px solid var(--rekit-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.zip-embed__frame {
-  width: 100%;
-  height: 100%;
-}
-.zip-embed__loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--rekit-surface);
-}
-.zip-embed__spinner {
-  display: block;
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--rekit-border);
-  border-top-color: var(--rekit-accent);
-  border-radius: 50%;
-  animation: zip-spin 0.7s linear infinite;
-}
-@keyframes zip-spin {
-  to { transform: rotate(360deg); }
-}
-.zip-embed__cancel {
-  align-self: flex-end;
-  padding: 6px 14px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--rekit-ink-muted);
-  border-radius: 6px;
-  transition: background 0.1s;
-}
-.zip-embed__cancel:hover {
-  background: var(--rekit-surface-muted);
-  color: var(--rekit-ink);
+.addr-card__memo {
+  font-size: 12px;
+  color: var(--rekit-ink-subtle);
+  margin-top: 2px;
 }
 
 /* items */
