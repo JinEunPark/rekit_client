@@ -1,56 +1,115 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
+import { won } from '@/design/tokens'
+import {
+  getDashboardSummary,
+  getDashboardSalesChart,
+  getDashboardPendingOrders,
+  getDashboardPopularCategories,
+  getDashboardStockAlerts,
+} from '@/api/admin/dashboard'
+import type { DashboardSummary, PendingOrderItem, CategoryStat, StockAlertItem } from '@/api/admin/dashboard'
+import type { SalesDataPoint } from '@/api/admin/sales'
+import { statusTone, statusLabel } from '@/stores/orders-helpers'
 
-type KpiTone = 'accent' | 'danger' | 'warn'
-type OrderTone = 'info' | 'a' | 'accent' | 'danger'
-
-const kpis: { l: string; v: string; d: string; s: string; tone: KpiTone }[] = [
-  { l: '오늘 주문', v: '14', d: '+3', s: '건', tone: 'accent' },
-  { l: '오늘 매출', v: '3,840,000', d: '+18%', s: '원', tone: 'accent' },
-  { l: '처리 대기', v: '7', d: '긴급 2', s: '건', tone: 'danger' },
-  { l: '재고 부족', v: '2', d: '품절 임박', s: '품목', tone: 'warn' },
+const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+const periods = [
+  { days: 7, label: '7일' },
+  { days: 30, label: '30일' },
+  { days: 90, label: '90일' },
 ]
-
-const bars = [
-  { d: '월', v: 0.45, val: '1.4M', cur: false },
-  { d: '화', v: 0.62, val: '1.9M', cur: false },
-  { d: '수', v: 0.38, val: '1.2M', cur: false },
-  { d: '목', v: 0.78, val: '2.4M', cur: false },
-  { d: '금', v: 0.55, val: '1.7M', cur: false },
-  { d: '토', v: 0.92, val: '2.9M', cur: false },
-  { d: '일', v: 1.0, val: '3.8M', cur: true },
-]
-
-const orders: { o: string; n: string; p: string; t: string; tone: OrderTone; time: string }[] = [
-  { o: 'RK-26050001', n: '박은영', p: '냉장고 외 2건', t: '결제완료', tone: 'info', time: '10분 전' },
-  { o: 'RK-26050002', n: '이민호', p: 'TV 55형', t: '준비중', tone: 'a', time: '32분 전' },
-  { o: 'RK-26050003', n: '최선우', p: '에어컨', t: '결제완료', tone: 'info', time: '1시간 전' },
-  { o: 'RK-26050004', n: '정현지', p: '세탁기', t: '준비중', tone: 'a', time: '2시간 전' },
-]
-
-const cats = [
-  { c: '냉장고', n: 32, p: 78 },
-  { c: '세탁기', n: 21, p: 51 },
-  { c: 'TV', n: 18, p: 44 },
-  { c: '에어컨', n: 9, p: 22 },
-]
-
-const stocks: { p: string; s: string; tone: 'danger' | 'warn' }[] = [
-  { p: 'LG OLED TV 48형', s: '재고 0', tone: 'danger' },
-  { p: '쿠쿠 전자레인지 20L', s: '재고 1개', tone: 'warn' },
-  { p: '캐리어 스탠드 에어컨', s: '문의 12건 / 재고 1', tone: 'warn' },
-]
-
-const periodLabels = ['7일', '30일', '90일']
 const period = ref(0)
+
+const summary = ref<DashboardSummary | null>(null)
+const chartData = ref<SalesDataPoint[]>([])
+const pendingOrders = ref<PendingOrderItem[]>([])
+const popularCats = ref<CategoryStat[]>([])
+const stockAlerts = ref<StockAlertItem[]>([])
+
+const kpis = computed(() => {
+  const s = summary.value
+  if (!s) return []
+  return [
+    { l: '오늘 주문', v: String(s.today_orders), s: '건', d: '', tone: 'accent' as const },
+    { l: '오늘 매출', v: won(s.today_revenue).replace('원', '').trim(), s: '원', d: '', tone: 'accent' as const },
+    { l: '처리 대기', v: String(s.pending_count), s: '건', d: s.pending_count > 0 ? '긴급 확인' : '', tone: 'danger' as const },
+    { l: '재고 부족', v: String(s.low_stock_count), s: '품목', d: '', tone: 'warn' as const },
+  ]
+})
+
+const bars = computed(() => {
+  if (!chartData.value.length) return []
+  const maxRev = Math.max(...chartData.value.map((d) => d.revenue), 1)
+  return chartData.value.map((d, i) => ({
+    d: DAY_LABELS[new Date(d.date).getDay()],
+    v: d.revenue / maxRev,
+    val: d.revenue >= 1_000_000
+      ? `${(d.revenue / 1_000_000).toFixed(1)}M`
+      : `${Math.round(d.revenue / 1000)}K`,
+    cur: i === chartData.value.length - 1,
+  }))
+})
+
+const catsWithPct = computed(() => {
+  if (!popularCats.value.length) return []
+  const max = Math.max(...popularCats.value.map((c) => c.order_count), 1)
+  return popularCats.value.map((c) => ({
+    c: c.category,
+    n: c.order_count,
+    p: Math.round((c.order_count / max) * 100),
+  }))
+})
+
+const stocks = computed(() =>
+  stockAlerts.value.map((s) => ({
+    p: s.title,
+    s: s.stock === 0 ? '재고 0' : `재고 ${s.stock}개`,
+    tone: (s.stock === 0 ? 'danger' : 'warn') as 'danger' | 'warn',
+  })),
+)
+
+function relativeTime(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60) return '방금 전'
+  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`
+  return `${Math.floor(diff / 86400)}일 전`
+}
+
+async function loadChart() {
+  try {
+    const res = await getDashboardSalesChart(periods[period.value]!.days)
+    chartData.value = res.data
+  } catch {}
+}
+
+watch(period, loadChart)
+
+onMounted(async () => {
+  try {
+    const [sum, pending, cats, stockRes] = await Promise.all([
+      getDashboardSummary(),
+      getDashboardPendingOrders(),
+      getDashboardPopularCategories(),
+      getDashboardStockAlerts(),
+    ])
+    summary.value = sum
+    pendingOrders.value = pending
+    popularCats.value = cats
+    stockAlerts.value = stockRes
+  } catch (err) {
+    console.error('[dashboard]', err)
+  }
+  loadChart()
+})
 </script>
 
 <template>
-  <AdminShell active="dashboard" title="대시보드" subtitle="2026년 5월 1일(금) · 오늘의 운영 현황">
+  <AdminShell active="dashboard" title="대시보드" :subtitle="`오늘의 운영 현황`">
     <template #header-right>
       <Button variant="secondary" size="sm" leading-icon="download">CSV 내보내기</Button>
       <RouterLink to="/admin/products/new" class="header-link">
@@ -72,20 +131,17 @@ const period = ref(0)
     <div class="row2">
       <div class="card">
         <div class="card__head">
-          <div>
-            <div class="card__title">최근 7일 매출</div>
-            <div class="card__sub">2026.04.25 ~ 05.01</div>
-          </div>
+          <div class="card__title">최근 매출 추이</div>
           <div class="periods">
             <button
-              v-for="(p, i) in periodLabels"
-              :key="p"
+              v-for="(p, i) in periods"
+              :key="p.label"
               type="button"
               class="period"
               :class="{ 'period--active': period === i }"
               @click="period = i"
             >
-              {{ p }}
+              {{ p.label }}
             </button>
           </div>
         </div>
@@ -105,15 +161,16 @@ const period = ref(0)
       <div class="card">
         <div class="card__title">처리 대기 주문</div>
         <div class="o-list">
-          <div v-for="o in orders" :key="o.o" class="o">
+          <div v-if="pendingOrders.length === 0" class="o-empty">처리 대기 주문이 없습니다.</div>
+          <div v-for="o in pendingOrders" :key="o.order_number" class="o">
             <div class="o__main">
               <div class="o__row">
-                <span class="o__id">{{ o.o }}</span>
-                <Badge :tone="o.tone" size="xs">{{ o.t }}</Badge>
+                <span class="o__id">{{ o.order_number }}</span>
+                <Badge :tone="statusTone(o.status)" size="xs">{{ statusLabel(o.status) }}</Badge>
               </div>
-              <div class="o__name">{{ o.n }} · {{ o.p }}</div>
+              <div class="o__name">{{ o.username }} · {{ won(o.total_amount) }}</div>
             </div>
-            <div class="o__time">{{ o.time }}</div>
+            <div class="o__time">{{ relativeTime(o.created_at) }}</div>
           </div>
         </div>
       </div>
@@ -122,7 +179,7 @@ const period = ref(0)
     <div class="row3">
       <div class="card">
         <div class="card__title">인기 카테고리</div>
-        <div v-for="r in cats" :key="r.c" class="cat">
+        <div v-for="r in catsWithPct" :key="r.c" class="cat">
           <div class="bar__head">
             <span class="cat__name">{{ r.c }}</span>
             <span class="cat__n">{{ r.n }}건 판매</span>

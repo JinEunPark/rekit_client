@@ -1,85 +1,105 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
+import { createAdminProduct } from '@/api/admin/products'
+import { ApiError } from '@/api/client'
+import {
+  CATEGORY_OPTS,
+  GRADE_DEFS as grades,
+  OPERATION_OPTS as operationOpts,
+  DAMAGE_OPTS as damageOpts,
+  VISIBILITY_OPTS as visibilityOpts,
+  parseNum,
+  calcDiscountPct,
+} from './productFormHelpers'
+import type { ConditionGrade } from './productFormHelpers'
 
-type Grade = 'A' | 'B' | 'C'
-type Visibility = 'public' | 'private' | 'scheduled'
+const router = useRouter()
 
-const title = ref('삼성 비스포크 4도어 냉장고 RF85B9000AP')
-const brand = ref('삼성전자')
-const model = ref('RF85B9000AP')
-const category = ref('냉장고')
-const subCategory = ref('4도어')
-const year = ref('2022년')
-const size = ref('856L · 912 × 1853 × 716 mm')
+const title = ref('')
+const brand = ref('')
+const model = ref('')
+const category = ref('REFRIGERATOR')
+const year = ref('')
+const size = ref('')
 
-const grade = ref<Grade>('A')
+const grade = ref<ConditionGrade>('A')
 const operation = ref(0) // 0=정상, 1=부분이상, 2=미작동
-const damage = ref(1) // 0=없음, 1=경미, 2=있음
-const stateDesc = ref(
-  '좌측 도어 하단에 1cm 가량의 미세 스크래치 1개. 내부 선반·서랍 모두 정상. 제빙기 동작 확인 완료. 도어 패킹 양호.',
-)
+const damage = ref(0)
+const stateDesc = ref('')
 
-const original = ref('3,890,000')
-const price = ref('1,290,000')
+const original = ref('')
+const price = ref('')
 const stock = ref('1')
 const shippingMethod = ref('전문 설치 배송')
-const shippingFee = ref('40,000')
+const shippingFee = ref('')
 const installArea = ref('수도권 전 지역')
 
-const visibility = ref<Visibility>('public')
-
-const grades: { g: Grade; label: string; desc: string; color: string; bg: string }[] = [
-  { g: 'A', label: '상급', desc: '외관 거의 새것\n동작 완벽', color: 'var(--rekit-accent)', bg: 'var(--rekit-accent-soft)' },
-  { g: 'B', label: '중급', desc: '사용 흔적 약간\n동작 정상', color: '#D4A23A', bg: '#F8F0DC' },
-  { g: 'C', label: '하급', desc: '흠집/얼룩 다수\n동작 정상', color: '#C97A3F', bg: '#F8E8DA' },
-]
-
-const operationOpts = ['정상 동작', '부분 이상', '미작동']
-const damageOpts = ['없음', '경미', '있음']
+const visibility = ref<'public' | 'private'>('public')
+const saving = ref(false)
+const saveError = ref('')
 
 const images: { label: string | null; primary?: boolean; warn?: boolean; filled: boolean }[] = [
-  { label: '정면', primary: true, filled: true },
-  { label: '측면', filled: true },
-  { label: '내부', filled: true },
-  { label: '흠집부위', filled: true, warn: true },
+  { label: null, filled: false },
+  { label: null, filled: false },
   { label: null, filled: false },
 ]
 
-const visibilityOpts: { id: Visibility; label: string }[] = [
-  { id: 'public', label: '판매중 (즉시 공개)' },
-  { id: 'private', label: '비공개 (임시 저장)' },
-  { id: 'scheduled', label: '예약 공개' },
-]
-
 const checklist = computed(() => [
-  { t: '기본 정보 입력', done: !!title.value && !!brand.value && !!model.value },
+  { t: '기본 정보 입력', done: !!title.value.trim() && !!brand.value.trim() },
   { t: '상태 등급 선택', done: !!grade.value },
-  { t: '이미지 4장 이상', done: images.filter((i) => i.filled).length >= 4 },
   { t: '판매가 입력', done: !!price.value.trim() },
-  { t: '배송 정보 입력', done: false },
+  { t: '재고 수량 입력', done: parseNum(stock.value) > 0 },
 ])
 
-const discountPct = computed(() => {
-  const o = Number(original.value.replace(/[^0-9]/g, ''))
-  const p = Number(price.value.replace(/[^0-9]/g, ''))
-  if (!o || !p) return 0
-  return Math.round((1 - p / o) * 100)
-})
+const isReady = computed(() => checklist.value.every((c) => c.done))
+
+const discountPct = computed(() => calcDiscountPct(original.value, price.value))
+
+async function handleSave(asDraft = false) {
+  if (!title.value.trim() || !price.value.trim()) {
+    saveError.value = '상품명과 판매가는 필수입니다.'
+    return
+  }
+  saving.value = true
+  saveError.value = ''
+  try {
+    await createAdminProduct({
+      title: title.value.trim(),
+      description: stateDesc.value.trim() || undefined,
+      category: category.value,
+      brand: brand.value.trim() || null,
+      model_name: model.value.trim() || null,
+      year_estimate: parseNum(year.value) || null,
+      condition_grade: grade.value,
+      warranty_works: operation.value === 0,
+      price: parseNum(price.value),
+      original_price: parseNum(original.value) || null,
+      stock: parseNum(stock.value) || 1,
+      status: asDraft ? 'INACTIVE' : (visibility.value === 'public' ? 'ACTIVE' : 'INACTIVE'),
+    })
+    router.push('/admin/products')
+  } catch (err) {
+    saveError.value = err instanceof ApiError ? err.message : '저장 중 오류가 발생했습니다.'
+    saving.value = false
+  }
+}
 </script>
 
 <template>
   <AdminShell active="products" title="상품 등록" subtitle="새 폐업 가전 상품을 등록합니다">
     <template #header-right>
-      <Button variant="secondary" size="sm">임시저장</Button>
+      <Button variant="secondary" size="sm" :disabled="saving" @click="handleSave(true)">임시저장</Button>
       <RouterLink to="/admin/products" class="cancel-link">
         <Button variant="secondary" size="sm">취소</Button>
       </RouterLink>
-      <Button variant="primary" size="sm" leading-icon="check">등록하기</Button>
+      <Button variant="primary" size="sm" leading-icon="check" :disabled="saving || !isReady" @click="handleSave(false)">
+        {{ saving ? '저장 중…' : '등록하기' }}
+      </Button>
     </template>
 
     <div class="crumb">
@@ -113,16 +133,9 @@ const discountPct = computed(() => {
             </div>
             <div class="field">
               <label class="field__label">카테고리 <span class="req">*</span></label>
-              <div class="row2">
-                <button type="button" class="input input--filled select">
-                  <span>{{ category }}</span>
-                  <IconBase name="chevronDown" :size="16" />
-                </button>
-                <button type="button" class="input input--filled select">
-                  <span>{{ subCategory }}</span>
-                  <IconBase name="chevronDown" :size="16" />
-                </button>
-              </div>
+              <select v-model="category" class="input input--filled">
+                <option v-for="c in CATEGORY_OPTS" :key="c.id" :value="c.id">{{ c.label }}</option>
+              </select>
             </div>
             <div class="field">
               <label class="field__label">제조연도</label>
@@ -352,7 +365,10 @@ const discountPct = computed(() => {
               <span class="checklist__t" :class="{ 'checklist__t--muted': !c.done }">{{ c.t }}</span>
             </div>
           </div>
-          <Button variant="accent" size="md" full leading-icon="check">등록하기</Button>
+          <div v-if="saveError" class="save-error">{{ saveError }}</div>
+          <Button variant="accent" size="md" full leading-icon="check" :disabled="saving || !isReady" @click="handleSave(false)">
+            {{ saving ? '저장 중…' : '등록하기' }}
+          </Button>
         </div>
       </aside>
     </div>
@@ -833,6 +849,11 @@ const discountPct = computed(() => {
   font-size: 12.5px;
 }
 .checklist__t--muted { opacity: 0.55; }
+.save-error {
+  font-size: 12px;
+  color: var(--rekit-danger);
+  margin-bottom: 4px;
+}
 
 @media (min-width: 768px) {
   .grid2 { grid-template-columns: 1fr 1fr; }

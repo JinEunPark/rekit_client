@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
 
 const TOKEN_KEY = 'rekit.auth.access_token.v1'
 
@@ -47,7 +47,7 @@ async function attemptRefresh(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async () => {
     try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { Accept: 'application/json' },
@@ -83,7 +83,7 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
 
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(`${API_BASE_URL}${path}`, {
       method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
       headers,
       credentials: 'include',

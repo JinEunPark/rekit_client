@@ -15,6 +15,8 @@ export interface UserResponse {
   phone?: string | null
   verified: boolean
   ecoKg: number
+  /** 백엔드 UserRole enum: "USER" | "ADMIN". GET /users/me 에 미포함 시 undefined → 'USER' fallback. */
+  role?: 'USER' | 'ADMIN'
 }
 
 export interface SignInPayload {

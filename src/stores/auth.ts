@@ -14,6 +14,7 @@ export interface User {
   phone?: string
   verified: boolean
   ecoKg: number
+  role: 'USER' | 'ADMIN'
 }
 
 const STORAGE_KEY = 'rekit.auth.user.v3'
@@ -22,7 +23,9 @@ function loadUser(): User | null {
   if (typeof localStorage === 'undefined') return null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as User) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<User>
+    return { ...parsed, role: parsed.role ?? 'USER' } as User
   } catch {
     return null
   }
@@ -31,6 +34,7 @@ function loadUser(): User | null {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(loadUser())
   const isAuthenticated = computed(() => user.value !== null)
+  const isAdmin = computed(() => user.value?.role === 'ADMIN')
   const initial = computed(() => (user.value ? user.value.username.charAt(0) : ''))
 
   function persist() {
@@ -48,6 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
       phone: input.phone,
       verified: input.verified ?? false,
       ecoKg: input.ecoKg ?? 86,
+      role: input.role ?? 'USER',
     }
     persist()
   }
@@ -68,6 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
         phone: me.phone ?? undefined,
         verified: me.verified,
         ecoKg: me.ecoKg,
+        role: me.role ?? 'USER',
       }
       persist()
     } catch {
@@ -98,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
       phone: res.phone ?? undefined,
       verified: res.verified,
       ecoKg: res.ecoKg,
+      role: res.role ?? 'USER',
     }
     persist()
   }
@@ -106,5 +113,5 @@ export const useAuthStore = defineStore('auth', () => {
     window.addEventListener('rekit:auth-expired', clearLocal)
   }
 
-  return { user, isAuthenticated, initial, login, setSession, fetchMe, logout, updateProfile }
+  return { user, isAuthenticated, isAdmin, initial, login, setSession, fetchMe, logout, updateProfile }
 })

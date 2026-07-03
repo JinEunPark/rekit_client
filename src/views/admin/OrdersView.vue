@@ -1,71 +1,116 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import { won } from '@/design/tokens'
-import { useOrderStore, type Order } from '@/stores/orders'
 import { statusLabel, statusTone } from '@/stores/orders-helpers'
+import type { OrderStatus } from '@/api/orders'
+import {
+  listAdminOrders,
+  updateAdminOrderStatus,
+  inputShipment,
+  cancelAdminOrder,
+  exportOrdersCsv,
+} from '@/api/admin/orders'
+import type { AdminOrderListItem, AdminOrderStatusCounts } from '@/api/admin/orders'
+import { ApiError } from '@/api/client'
 
-type TabId = 'all' | 'pending' | 'paid' | 'prepping' | 'shipping' | 'delivered' | 'cancelled'
+type TabId = keyof AdminOrderStatusCounts
 
-const orderStore = useOrderStore()
-
-const tabs: { id: TabId; t: string; match: (o: Order) => boolean }[] = [
-  { id: 'all', t: '전체', match: () => true },
-  { id: 'pending', t: '결제대기', match: (o) => o.status === 'PENDING' },
-  { id: 'paid', t: '결제완료', match: (o) => o.status === 'PAID' },
-  { id: 'prepping', t: '준비중', match: (o) => o.status === 'PREPARING' },
-  { id: 'shipping', t: '배송중', match: (o) => o.status === 'SHIPPING' },
-  { id: 'delivered', t: '배송완료', match: (o) => o.status === 'DELIVERED' },
-  { id: 'cancelled', t: '취소/환불', match: (o) => o.status === 'CANCELLED' || o.status === 'REFUNDED' },
+const tabs: { id: TabId; t: string; status?: OrderStatus }[] = [
+  { id: 'all', t: '전체' },
+  { id: 'paid', t: '결제완료', status: 'PAID' },
+  { id: 'preparing', t: '준비중', status: 'PREPARING' },
+  { id: 'shipping', t: '배송중', status: 'SHIPPING' },
+  { id: 'delivered', t: '배송완료', status: 'DELIVERED' },
+  { id: 'cancelled', t: '취소/환불', status: 'CANCELLED' },
 ]
 
 const active = ref<TabId>('all')
+const orders = ref<AdminOrderListItem[]>([])
+const counts = ref<AdminOrderStatusCounts>({ all: 0, paid: 0, preparing: 0, shipping: 0, delivered: 0, cancelled: 0 })
+const loading = ref(false)
+const actionError = ref('')
 
-const counts = computed(() => {
-  const map: Record<TabId, number> = {
-    all: orderStore.orders.length,
-    pending: 0, paid: 0, prepping: 0, shipping: 0, delivered: 0, cancelled: 0,
+// 송장 입력 모달 상태
+const shipmentTarget = ref<string | null>(null)
+const carrier = ref('')
+const trackingNumber = ref('')
+
+const exportHref = computed(() => exportOrdersCsv(tabs.find((t) => t.id === active.value)?.status))
+
+async function load() {
+  loading.value = true
+  actionError.value = ''
+  try {
+    const tab = tabs.find((t) => t.id === active.value)
+    const res = await listAdminOrders({ status: tab?.status, size: 50 })
+    orders.value = res.items
+    counts.value = res.counts
+  } catch (err) {
+    console.error('[admin/orders]', err)
+  } finally {
+    loading.value = false
   }
-  for (const o of orderStore.orders) {
-    if (o.status === 'PENDING') map.pending++
-    if (o.status === 'PAID') map.paid++
-    if (o.status === 'PREPARING') map.prepping++
-    if (o.status === 'SHIPPING') map.shipping++
-    if (o.status === 'DELIVERED') map.delivered++
-    if (o.status === 'CANCELLED' || o.status === 'REFUNDED') map.cancelled++
+}
+
+async function startPrepping(orderNumber: string) {
+  try {
+    await updateAdminOrderStatus(orderNumber, 'PREPARING')
+    await load()
+  } catch (err) {
+    actionError.value = err instanceof ApiError ? err.message : '오류가 발생했습니다.'
   }
-  return map
-})
+}
 
-const filtered = computed(() => {
-  const tab = tabs.find((t) => t.id === active.value)!
-  return orderStore.orders.filter(tab.match)
-})
+async function submitShipment() {
+  if (!shipmentTarget.value || !carrier.value.trim() || !trackingNumber.value.trim()) return
+  try {
+    await inputShipment(shipmentTarget.value, carrier.value.trim(), trackingNumber.value.trim())
+    shipmentTarget.value = null
+    carrier.value = ''
+    trackingNumber.value = ''
+    await load()
+  } catch (err) {
+    actionError.value = err instanceof ApiError ? err.message : '오류가 발생했습니다.'
+  }
+}
 
-const todaySummary = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
-  const todayOrders = orderStore.orders.filter((o) => o.createdAt.slice(0, 10) === today)
-  const pending = orderStore.orders.filter((o) => o.status === 'PENDING').length
-  return { today: todayOrders.length, pending }
-})
+async function cancel(orderNumber: string) {
+  if (!confirm(`주문 ${orderNumber}을 취소하시겠습니까?`)) return
+  try {
+    await cancelAdminOrder(orderNumber, '관리자 취소')
+    await load()
+  } catch (err) {
+    actionError.value = err instanceof ApiError ? err.message : '오류가 발생했습니다.'
+  }
+}
+
+function switchTab(id: TabId) {
+  active.value = id
+  load()
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso)
   return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+
+onMounted(load)
 </script>
 
 <template>
   <AdminShell
     active="orders"
     title="주문 관리"
-    :subtitle="`처리 대기 ${todaySummary.pending}건 · 오늘 ${todaySummary.today}건`"
+    :subtitle="`전체 ${counts.all}건`"
   >
     <template #header-right>
-      <Button variant="secondary" size="sm" leading-icon="download">CSV 내보내기</Button>
+      <a :href="exportHref" download>
+        <Button variant="secondary" size="sm" leading-icon="download">CSV 내보내기</Button>
+      </a>
     </template>
 
     <div class="tabs">
@@ -74,13 +119,19 @@ function formatDate(iso: string) {
         :key="s.id"
         type="button"
         class="tab"
-        :class="{ 'tab--active': active === s.id, 'tab--alert': s.id === 'pending' && counts.pending > 0 }"
-        @click="active = s.id"
+        :class="{ 'tab--active': active === s.id, 'tab--alert': s.id === 'paid' && counts.paid > 0 }"
+        @click="switchTab(s.id)"
       >
-        <span v-if="s.id === 'pending' && counts.pending > 0" class="tab__dot" />
+        <span v-if="s.id === 'paid' && counts.paid > 0" class="tab__dot" />
         {{ s.t }}
         <span class="tab__n">{{ counts[s.id] }}</span>
       </button>
+    </div>
+
+    <div v-if="actionError" class="action-error">
+      <IconBase name="info" :size="14" />
+      {{ actionError }}
+      <button type="button" class="action-error__close" @click="actionError = ''">✕</button>
     </div>
 
     <div class="table">
@@ -88,44 +139,37 @@ function formatDate(iso: string) {
         <span /><span>주문번호</span><span>주문자</span><span>상품</span><span>결제금액</span><span>상태</span><span>송장번호</span><span>관리</span>
       </div>
       <div
-        v-for="(o, i) in filtered"
-        :key="o.orderNumber"
+        v-for="(o, i) in orders"
+        :key="o.order_number"
         class="table__row"
         :class="{
           'table__row--first': i === 0,
-          'table__row--alert': o.status === 'PENDING',
+          'table__row--alert': o.status === 'PAID',
         }"
       >
         <span class="cb" />
         <div>
-          <div class="id">{{ o.orderNumber }}</div>
-          <div class="date">{{ formatDate(o.createdAt) }}</div>
+          <div class="id">{{ o.order_number }}</div>
+          <div class="date">{{ formatDate(o.created_at) }}</div>
         </div>
         <div>
-          <div class="name">{{ o.recipientName }}</div>
-          <div class="phone">{{ o.recipientPhone }}</div>
+          <div class="name">{{ o.username }}</div>
+          <div class="phone">{{ o.recipient_phone }}</div>
         </div>
         <span class="items">
-          {{ o.items[0]?.titleSnapshot ?? '—' }}{{ o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : '' }}
+          {{ o.first_item_title }}{{ o.item_count > 1 ? ` 외 ${o.item_count - 1}건` : '' }}
         </span>
-        <span class="amt">{{ won(o.totalAmount) }}</span>
+        <span class="amt">{{ won(o.total_amount) }}</span>
         <span>
           <Badge :tone="statusTone(o.status)" size="sm">{{ statusLabel(o.status) }}</Badge>
         </span>
         <span class="tracking">—</span>
         <span class="action">
           <Button
-            v-if="o.status === 'PENDING'"
-            variant="accent"
-            size="sm"
-            leading-icon="check"
-          >
-            결제 승인
-          </Button>
-          <Button
-            v-else-if="o.status === 'PAID'"
+            v-if="o.status === 'PAID'"
             variant="primary"
             size="sm"
+            @click="startPrepping(o.order_number)"
           >
             준비 시작
           </Button>
@@ -133,26 +177,63 @@ function formatDate(iso: string) {
             v-else-if="o.status === 'PREPARING'"
             variant="primary"
             size="sm"
+            @click="shipmentTarget = o.order_number"
           >
             송장입력
+          </Button>
+          <Button
+            v-else-if="o.status !== 'CANCELLED' && o.status !== 'DELIVERED' && o.status !== 'REFUNDED'"
+            variant="secondary"
+            size="sm"
+            @click="cancel(o.order_number)"
+          >
+            취소
           </Button>
           <span v-else class="action__view">상세보기</span>
         </span>
       </div>
-      <div v-if="filtered.length === 0" class="empty">
+      <div v-if="!loading && orders.length === 0" class="empty">
         <div v-if="active === 'all'" class="empty__main">
           아직 주문이 없습니다.
           <div class="empty__sub">고객이 주문하면 이곳에 표시됩니다.</div>
         </div>
         <span v-else>해당 상태의 주문이 없습니다.</span>
       </div>
+      <div v-if="loading" class="empty">불러오는 중…</div>
     </div>
 
-    <div v-if="counts.pending > 0 && active !== 'pending'" class="hint">
+    <div v-if="counts.paid > 0 && active !== 'paid'" class="hint">
       <IconBase name="info" :size="14" />
-      <span>결제 대기 주문이 <b>{{ counts.pending }}건</b> 있어요. "결제대기" 탭에서 확인하세요.</span>
+      <span>결제 완료 주문이 <b>{{ counts.paid }}건</b> 있어요. "결제완료" 탭에서 확인하세요.</span>
     </div>
   </AdminShell>
+
+  <!-- 송장 입력 모달 -->
+  <div v-if="shipmentTarget" class="modal-backdrop" @click.self="shipmentTarget = null">
+    <div class="modal">
+      <div class="modal__title">송장 입력</div>
+      <div class="modal__order">{{ shipmentTarget }}</div>
+      <div class="field">
+        <label class="field__label">택배사</label>
+        <input v-model="carrier" class="field__input" placeholder="예: CJ대한통운" />
+      </div>
+      <div class="field">
+        <label class="field__label">송장번호</label>
+        <input v-model="trackingNumber" class="field__input" placeholder="예: 123456789012" />
+      </div>
+      <div class="modal__actions">
+        <Button variant="secondary" size="sm" @click="shipmentTarget = null">취소</Button>
+        <Button
+          variant="primary"
+          size="sm"
+          :disabled="!carrier.trim() || !trackingNumber.trim()"
+          @click="submitShipment"
+        >
+          입력 완료
+        </Button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -190,7 +271,6 @@ function formatDate(iso: string) {
 }
 .tab__n {
   font-size: 11px;
-  opacity: 1;
   font-family: var(--rekit-font-mono);
 }
 .tab--active .tab__n { opacity: 0.7; }
@@ -199,6 +279,27 @@ function formatDate(iso: string) {
   height: 6px;
   border-radius: 999px;
   background: var(--rekit-danger);
+}
+
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #FFF0F0;
+  border: 1px solid var(--rekit-danger);
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: var(--rekit-danger);
+  margin-bottom: 12px;
+}
+.action-error__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--rekit-danger);
+  font-size: 12px;
 }
 
 .table {
@@ -229,9 +330,7 @@ function formatDate(iso: string) {
   border-top: 1px solid var(--rekit-border);
 }
 .table__row--first { border-top: 0; }
-.table__row--alert {
-  background: #FFF8E8;
-}
+.table__row--alert { background: #FFF8E8; }
 .cb {
   width: 16px;
   height: 16px;
@@ -293,8 +392,57 @@ function formatDate(iso: string) {
 @media (max-width: 1023px) {
   .table { overflow-x: auto; }
   .table__head,
-  .table__row {
-    min-width: 1000px;
-  }
+  .table__row { min-width: 1000px; }
+}
+
+/* 송장 입력 모달 */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--rekit-surface);
+  border-radius: 20px;
+  padding: 28px 24px;
+  width: min(400px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal__title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.modal__order {
+  font-size: 12px;
+  font-family: var(--rekit-font-mono);
+  color: var(--rekit-ink-subtle);
+  margin-top: -8px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label { font-size: 12px; font-weight: 600; color: var(--rekit-ink-muted); }
+.field__input {
+  padding: 10px 14px;
+  border: 1.5px solid var(--rekit-border-strong);
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  background: var(--rekit-surface);
+  color: var(--rekit-ink);
+}
+.field__input:focus {
+  border-color: var(--rekit-ink);
+  box-shadow: 0 0 0 3px rgba(26,26,23,0.06);
+}
+.modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 </style>

@@ -1,46 +1,112 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { discountPct, PRODUCTS } from '@/data/products'
 import { won } from '@/design/tokens'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
-import ProductTile from '@/components/ds/ProductTile.vue'
+import {
+  listAdminProducts,
+  deleteAdminProduct,
+} from '@/api/admin/products'
+import type { AdminProductDetailResponse, ProductStatus } from '@/api/admin/products'
+import { ApiError } from '@/api/client'
+
+type FilterId = 'all' | 'sale' | 'soldout' | 'private'
+
+const filterDefs: { id: FilterId; label: string; status?: ProductStatus }[] = [
+  { id: 'all', label: '전체' },
+  { id: 'sale', label: '판매중', status: 'ACTIVE' },
+  { id: 'soldout', label: '품절', status: 'SOLD_OUT' },
+  { id: 'private', label: '비공개', status: 'INACTIVE' },
+]
 
 const search = ref('')
-const filter = ref<'all' | 'sale' | 'soldout' | 'private'>('all')
+const filter = ref<FilterId>('all')
+const products = ref<AdminProductDetailResponse[]>([])
+const counts = ref<Record<FilterId, number>>({ all: 0, sale: 0, soldout: 0, private: 0 })
+const loading = ref(false)
+const actionError = ref('')
 
-const filtered = computed(() => {
-  let list = PRODUCTS
-  const q = search.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        p.model.toLowerCase().includes(q),
-    )
+let searchTimer: ReturnType<typeof setTimeout>
+
+async function load() {
+  loading.value = true
+  try {
+    const f = filterDefs.find((fd) => fd.id === filter.value)
+    const res = await listAdminProducts({
+      status: f?.status,
+      q: search.value.trim() || undefined,
+      size: 50,
+    })
+    products.value = res.items
+    counts.value[filter.value] = res.meta.total
+  } catch (err) {
+    console.error('[admin/products]', err)
+  } finally {
+    loading.value = false
   }
-  if (filter.value === 'sale') list = list.filter((p) => p.stock > 0)
-  if (filter.value === 'soldout') list = list.filter((p) => p.stock === 0)
-  return list
-})
+}
 
-const counts = computed(() => ({
-  all: PRODUCTS.length,
-  sale: PRODUCTS.filter((p) => p.stock > 0).length,
-  soldout: PRODUCTS.filter((p) => p.stock === 0).length,
-  private: 0,
-}))
+async function loadCounts() {
+  try {
+    const [all, active, soldout, inactive] = await Promise.all([
+      listAdminProducts({ size: 1 }),
+      listAdminProducts({ status: 'ACTIVE', size: 1 }),
+      listAdminProducts({ status: 'SOLD_OUT', size: 1 }),
+      listAdminProducts({ status: 'INACTIVE', size: 1 }),
+    ])
+    counts.value = {
+      all: all.meta.total,
+      sale: active.meta.total,
+      soldout: soldout.meta.total,
+      private: inactive.meta.total,
+    }
+  } catch {}
+}
 
-const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] = [
-  { id: 'all', label: '전체' },
-  { id: 'sale', label: '판매중' },
-  { id: 'soldout', label: '품절' },
-  { id: 'private', label: '비공개' },
-]
+function onSearch() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(load, 300)
+}
+
+function switchFilter(id: FilterId) {
+  filter.value = id
+  load()
+}
+
+async function deleteProduct(id: number, title: string) {
+  if (!confirm(`"${title}" 상품을 삭제(비공개 전환)하시겠습니까?`)) return
+  try {
+    await deleteAdminProduct(id)
+    await Promise.all([load(), loadCounts()])
+  } catch (err) {
+    actionError.value = err instanceof ApiError ? err.message : '삭제 중 오류가 발생했습니다.'
+  }
+}
+
+function gradeTone(grade: string): 'accent' | 'info' | 'neutral' {
+  return grade === 'A' ? 'accent' : grade === 'B' ? 'info' : 'neutral'
+}
+
+function statusBadgeTone(s: ProductStatus): 'accent' | 'danger' | 'neutral' {
+  return s === 'ACTIVE' ? 'accent' : s === 'SOLD_OUT' ? 'danger' : 'neutral'
+}
+
+function statusText(s: ProductStatus): string {
+  return s === 'ACTIVE' ? '판매중' : s === 'SOLD_OUT' ? '품절' : '비공개'
+}
+
+function discountPct(p: AdminProductDetailResponse): number | null {
+  if (p.discount_pct !== null) return p.discount_pct
+  if (p.original_price && p.original_price > p.price) {
+    return Math.round(((p.original_price - p.price) / p.original_price) * 100)
+  }
+  return null
+}
+
+onMounted(() => Promise.all([load(), loadCounts()]))
 </script>
 
 <template>
@@ -48,7 +114,12 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
     <template #header-right>
       <div class="search">
         <IconBase name="search" :size="16" />
-        <input v-model="search" type="search" placeholder="모델명, 브랜드 검색" />
+        <input
+          v-model="search"
+          type="search"
+          placeholder="모델명, 브랜드 검색"
+          @input="onSearch"
+        />
       </div>
       <RouterLink to="/admin/products/new" class="header-link">
         <Button variant="primary" size="sm" leading-icon="plus">상품 등록</Button>
@@ -57,45 +128,70 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
 
     <div class="chips">
       <button
-        v-for="f in filters"
+        v-for="f in filterDefs"
         :key="f.id"
         type="button"
         class="chip"
         :class="{ 'chip--active': filter === f.id }"
-        @click="filter = f.id"
+        @click="switchFilter(f.id)"
       >
         {{ f.label }} {{ counts[f.id] }}
       </button>
+    </div>
+
+    <div v-if="actionError" class="action-error">
+      <IconBase name="info" :size="14" />
+      {{ actionError }}
+      <button type="button" class="action-error__close" @click="actionError = ''">✕</button>
     </div>
 
     <div class="table">
       <div class="table__head">
         <span /><span /><span>상품</span><span>카테고리</span><span>등급</span><span>가격</span><span>재고</span><span>상태</span><span />
       </div>
-      <div v-for="(p, i) in filtered" :key="p.id" class="table__row" :class="{ 'table__row--first': i === 0 }">
+      <div
+        v-for="(p, i) in products"
+        :key="p.id"
+        class="table__row"
+        :class="{ 'table__row--first': i === 0 }"
+      >
         <span class="cb" />
         <div class="thumb">
-          <ProductTile :kind="p.kind" :tone="p.tone" ratio="1/1" radius="8px" :show-label="false" />
+          <img v-if="p.images[0]" :src="p.images[0].url" :alt="p.title" class="thumb__img" />
+          <div v-else class="thumb__placeholder">
+            <IconBase name="grid" :size="20" />
+          </div>
         </div>
         <div>
-          <div class="meta">{{ p.brand }} · {{ p.model }}</div>
+          <div class="meta">{{ p.brand ?? '—' }} · {{ p.model_name ?? '—' }}</div>
           <div class="title">{{ p.title }}</div>
         </div>
         <span class="cell-muted">{{ p.category }}</span>
-        <span><Badge :tone="(p.grade.toLowerCase() as 'a' | 'b' | 'c')" size="sm">{{ p.grade }}급</Badge></span>
+        <span>
+          <Badge :tone="gradeTone(p.condition_grade)" size="sm">{{ p.condition_grade }}급</Badge>
+        </span>
         <div>
           <div class="price">{{ won(p.price) }}</div>
-          <div class="price__o">{{ won(p.original) }} <span class="price__d">-{{ discountPct(p) }}%</span></div>
+          <div v-if="p.original_price" class="price__o">
+            {{ won(p.original_price) }}
+            <span v-if="discountPct(p)" class="price__d">-{{ discountPct(p) }}%</span>
+          </div>
         </div>
         <span class="stock" :class="{ 'stock--out': p.stock === 0 }">{{ p.stock }}개</span>
-        <Badge :tone="p.stock === 0 ? 'danger' : 'accent'" size="sm">
-          {{ p.stock === 0 ? '품절' : '판매중' }}
-        </Badge>
-        <button class="row-action" aria-label="수정">
-          <IconBase name="edit" :size="16" />
-        </button>
+        <Badge :tone="statusBadgeTone(p.status)" size="sm">{{ statusText(p.status) }}</Badge>
+        <div class="row-actions">
+          <RouterLink :to="`/admin/products/${p.id}/edit`">
+            <button class="row-action" aria-label="수정">
+              <IconBase name="edit" :size="16" />
+            </button>
+          </RouterLink>
+          <button class="row-action row-action--danger" aria-label="삭제" @click="deleteProduct(p.id, p.title)">
+            <IconBase name="trash" :size="16" />
+          </button>
+        </div>
       </div>
-      <div v-if="filtered.length === 0" class="empty">조건에 맞는 상품이 없습니다.</div>
+      <div v-if="!loading && products.length === 0" class="empty">조건에 맞는 상품이 없습니다.</div>
+      <div v-if="loading" class="empty">불러오는 중…</div>
     </div>
   </AdminShell>
 </template>
@@ -148,6 +244,27 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
   border-color: transparent;
 }
 
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #FFF0F0;
+  border: 1px solid var(--rekit-danger);
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: var(--rekit-danger);
+  margin-bottom: 12px;
+}
+.action-error__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--rekit-danger);
+  font-size: 12px;
+}
+
 .table {
   background: var(--rekit-surface);
   border: 1px solid var(--rekit-border);
@@ -157,7 +274,7 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
 .table__head,
 .table__row {
   display: grid;
-  grid-template-columns: 40px 80px 1.6fr 0.7fr 0.6fr 0.8fr 0.6fr 0.7fr 50px;
+  grid-template-columns: 40px 64px 1.6fr 0.7fr 0.6fr 0.8fr 0.6fr 0.7fr 72px;
   padding: 12px 16px;
   align-items: center;
   gap: 8px;
@@ -182,7 +299,23 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
   border-radius: 4px;
   border: 1.5px solid var(--rekit-border-strong);
 }
-.thumb { width: 56px; }
+.thumb { width: 56px; height: 56px; }
+.thumb__img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.thumb__placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: var(--rekit-surface-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rekit-ink-subtle);
+}
 .meta {
   font-size: 11px;
   color: var(--rekit-ink-subtle);
@@ -191,6 +324,9 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
 .title {
   font-weight: 600;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cell-muted { color: var(--rekit-ink-muted); }
 .price { font-weight: 700; }
@@ -207,6 +343,12 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
 }
 .stock { font-weight: 600; }
 .stock--out { color: var(--rekit-danger); }
+.row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.row-actions a { display: inline-flex; text-decoration: none; }
 .row-action {
   background: none;
   border: 0;
@@ -214,10 +356,15 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
   border-radius: 8px;
   color: var(--rekit-ink-subtle);
   cursor: pointer;
+  display: inline-flex;
 }
 .row-action:hover {
   background: var(--rekit-surface-muted);
   color: var(--rekit-ink);
+}
+.row-action--danger:hover {
+  background: #FFF0F0;
+  color: var(--rekit-danger);
 }
 .empty {
   padding: 40px 16px;
@@ -226,13 +373,10 @@ const filters: { id: 'all' | 'sale' | 'soldout' | 'private'; label: string }[] =
   font-size: 13px;
 }
 
-/* Tablet & below: scroll the table horizontally so columns stay readable */
 @media (max-width: 1023px) {
   .search input { width: 140px; }
   .table { overflow-x: auto; }
   .table__head,
-  .table__row {
-    min-width: 920px;
-  }
+  .table__row { min-width: 920px; }
 }
 </style>

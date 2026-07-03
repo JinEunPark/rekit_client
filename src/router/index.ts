@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -56,6 +57,8 @@ const router = createRouter({
     { path: '/admin', name: 'admin-dashboard', component: () => import('../views/admin/DashboardView.vue') },
     { path: '/admin/products', name: 'admin-products', component: () => import('../views/admin/ProductsView.vue') },
     { path: '/admin/products/new', name: 'admin-product-new', component: () => import('../views/admin/ProductNewView.vue') },
+    { path: '/admin/products/:id/edit', name: 'admin-product-edit', component: () => import('../views/admin/ProductEditView.vue') },
+    { path: '/admin/categories', name: 'admin-categories', component: () => import('../views/admin/CategoriesView.vue') },
     { path: '/admin/orders', name: 'admin-orders', component: () => import('../views/admin/OrdersView.vue') },
     { path: '/admin/members', name: 'admin-members', component: () => import('../views/admin/MembersView.vue') },
     { path: '/admin/sales', name: 'admin-sales', component: () => import('../views/admin/SalesView.vue') },
@@ -91,6 +94,19 @@ const router = createRouter({
     // 404 catch-all (must be last)
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },
   ],
+})
+
+router.beforeEach((to) => {
+  if (!to.path.startsWith('/admin')) return true
+
+  const auth = useAuthStore()
+  if (!auth.isAuthenticated) {
+    return { path: '/auth/sign-in', query: { redirect: to.fullPath } }
+  }
+  if (!auth.isAdmin) {
+    return { path: '/' }
+  }
+  return true
 })
 
 export default router

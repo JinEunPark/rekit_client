@@ -6,9 +6,19 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
 import type { IconName } from '@/design/icons'
 import { useAuthStore } from '@/stores/auth'
 
+const nav = [
+  { id: 'dashboard' as const, to: '/admin', i: 'chart' as IconName, t: '대시보드' },
+  { id: 'products' as const, to: '/admin/products', i: 'box' as IconName, t: '상품 관리' },
+  { id: 'categories' as const, to: '/admin/categories', i: 'grid' as IconName, t: '카테고리' },
+  { id: 'orders' as const, to: '/admin/orders', i: 'cart' as IconName, t: '주문 관리' },
+  { id: 'members' as const, to: '/admin/members', i: 'user' as IconName, t: '회원 관리' },
+  { id: 'sales' as const, to: '/admin/sales', i: 'wallet' as IconName, t: '매출 / 정산' },
+]
+type NavId = (typeof nav)[number]['id']
+
 withDefaults(
   defineProps<{
-    active?: 'dashboard' | 'products' | 'orders' | 'members' | 'sales'
+    active?: NavId
     title: string
     subtitle?: string
   }>(),
@@ -18,19 +28,10 @@ withDefaults(
 const route = useRoute()
 const auth = useAuthStore()
 
-const nav: { id: 'dashboard' | 'products' | 'orders' | 'members' | 'sales'; to: string; i: IconName; t: string }[] = [
-  { id: 'dashboard', to: '/admin', i: 'chart', t: '대시보드' },
-  { id: 'products', to: '/admin/products', i: 'box', t: '상품 관리' },
-  { id: 'orders', to: '/admin/orders', i: 'cart', t: '주문 관리' },
-  { id: 'members', to: '/admin/members', i: 'user', t: '회원 관리' },
-  { id: 'sales', to: '/admin/sales', i: 'wallet', t: '매출 / 정산' },
-]
-
 const drawerOpen = ref(false)
 watch(() => route.path, () => { drawerOpen.value = false })
 
 const operatorName = computed(() => auth.user?.username ?? '운영자')
-const operatorInitial = computed(() => operatorName.value.charAt(0))
 </script>
 
 <template>
@@ -54,7 +55,7 @@ const operatorInitial = computed(() => operatorName.value.charAt(0))
       </nav>
       <div style="flex: 1" />
       <div class="admin__user">
-        <div class="admin__avatar">{{ operatorInitial }}</div>
+        <div class="admin__avatar">{{ operatorName.charAt(0) }}</div>
         <div style="flex: 1; min-width: 0">
           <div class="admin__user-name">{{ operatorName }}</div>
           <div class="admin__user-role">운영자</div>
