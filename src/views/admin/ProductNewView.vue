@@ -2,10 +2,11 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
+import ProductImageEditor, { type EditableImage } from '@/components/admin/ProductImageEditor.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
-import { createAdminProduct } from '@/api/admin/products'
+import { createAdminProduct, replaceProductImages } from '@/api/admin/products'
 import { ApiError } from '@/api/client'
 import {
   CATEGORY_OPTS,
@@ -43,17 +44,14 @@ const visibility = ref<'public' | 'private'>('public')
 const saving = ref(false)
 const saveError = ref('')
 
-const images: { label: string | null; primary?: boolean; warn?: boolean; filled: boolean }[] = [
-  { label: null, filled: false },
-  { label: null, filled: false },
-  { label: null, filled: false },
-]
+const images = ref<EditableImage[]>([])
 
 const checklist = computed(() => [
   { t: '기본 정보 입력', done: !!title.value.trim() && !!brand.value.trim() },
   { t: '상태 등급 선택', done: !!grade.value },
   { t: '판매가 입력', done: !!price.value.trim() },
   { t: '재고 수량 입력', done: parseNum(stock.value) > 0 },
+  { t: '이미지 최소 4장 등록', done: images.value.length >= 4 },
 ])
 
 const isReady = computed(() => checklist.value.every((c) => c.done))
@@ -68,7 +66,7 @@ async function handleSave(asDraft = false) {
   saving.value = true
   saveError.value = ''
   try {
-    await createAdminProduct({
+    const created = await createAdminProduct({
       title: title.value.trim(),
       description: stateDesc.value.trim() || undefined,
       category: category.value,
@@ -82,6 +80,9 @@ async function handleSave(asDraft = false) {
       stock: parseNum(stock.value) || 1,
       status: asDraft ? 'INACTIVE' : (visibility.value === 'public' ? 'ACTIVE' : 'INACTIVE'),
     })
+    if (images.value.length) {
+      await replaceProductImages(created.id, images.value)
+    }
     router.push('/admin/products')
   } catch (err) {
     saveError.value = err instanceof ApiError ? err.message : '저장 중 오류가 발생했습니다.'
@@ -221,31 +222,11 @@ async function handleSave(asDraft = false) {
             <h3 class="card__title">상품 이미지</h3>
           </header>
           <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 4장 이상 등록해 주세요</p>
-          <div class="imgs">
-            <div
-              v-for="(img, i) in images"
-              :key="i"
-              class="img"
-              :class="{ 'img--filled': img.filled, 'img--empty': !img.filled }"
-            >
-              <template v-if="img.filled">
-                <span v-if="img.primary" class="img__primary">대표</span>
-                <span class="img__label" :class="{ 'img__label--warn': img.warn }">{{ img.label }}</span>
-                <button type="button" class="img__remove" aria-label="이미지 삭제">
-                  <IconBase name="close" :size="12" :stroke="2.5" />
-                </button>
-                <IconBase name="box" :size="36" />
-              </template>
-              <template v-else>
-                <IconBase name="plus" :size="22" />
-                <span>이미지 추가</span>
-              </template>
-            </div>
-          </div>
-          <div class="hint">
-            <IconBase name="info" :size="14" />
-            <span>최소 4장 / 최대 10장 · 5MB 이하 · JPG, PNG · 첫 번째 이미지가 대표 이미지로 노출됩니다</span>
-          </div>
+          <ProductImageEditor
+            v-model:images="images"
+            :disabled="saving"
+            @error="(msg) => (saveError = msg)"
+          />
         </section>
 
         <section class="card">
@@ -583,86 +564,6 @@ async function handleSave(asDraft = false) {
   border-color: transparent;
 }
 
-.imgs {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-.img {
-  aspect-ratio: 1;
-  border-radius: 12px;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.img--filled {
-  background: linear-gradient(135deg, var(--rekit-surface-muted), var(--rekit-border));
-  border: 1px solid var(--rekit-border);
-  color: var(--rekit-ink-placeholder);
-}
-.img--empty {
-  background: var(--rekit-surface);
-  border: 1.5px dashed var(--rekit-border-strong);
-  color: var(--rekit-ink-subtle);
-  flex-direction: column;
-  gap: 6px;
-}
-.img--empty span { font-size: 11.5px; font-weight: 600; }
-.img__primary {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 3px 7px;
-  background: var(--rekit-ink);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
-}
-.img__label {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  padding: 3px 7px;
-  background: rgba(255, 255, 255, 0.92);
-  font-size: 10.5px;
-  font-weight: 600;
-  border-radius: 4px;
-  color: var(--rekit-ink);
-}
-.img__label--warn { color: var(--rekit-danger); }
-.img__remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.hint {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: var(--rekit-surface-muted);
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--rekit-ink-muted);
-}
-.hint svg { color: var(--rekit-ink-subtle); flex-shrink: 0; }
-
 .discount {
   margin-top: 14px;
   padding: 14px 18px;
@@ -858,7 +759,6 @@ async function handleSave(asDraft = false) {
 @media (min-width: 768px) {
   .grid2 { grid-template-columns: 1fr 1fr; }
   .field--full { grid-column: 1 / -1; }
-  .imgs { grid-template-columns: repeat(5, 1fr); }
   .card { padding: 28px; }
 }
 

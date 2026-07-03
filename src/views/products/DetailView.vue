@@ -8,6 +8,7 @@ import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import ProductCard from '@/components/products/ProductCard.vue'
+import ImageLightbox from '@/components/products/ImageLightbox.vue'
 import { useCartStore } from '@/stores/cart'
 import { useWishlistStore } from '@/stores/wishlist'
 import { useCategoryStore } from '@/stores/categories'
@@ -23,13 +24,13 @@ const vm = useDetailViewModel()
 const productId = computed(() => route.params.id as string)
 const product = computed(() => vm.product.value)
 
-const PLACEHOLDER_THUMBS: { l: string; t: Tone }[] = [
-  { l: '정면', t: 'mint' },
-  { l: '측면', t: 'sage' },
-  { l: '내부', t: 'cool' },
-  { l: '흠집', t: 'sand' },
-  { l: '뒷면', t: 'stone' },
-  { l: '제품번호', t: 'cream' },
+const PLACEHOLDER_THUMBS: { l: string; t: Tone; hasLabel: boolean }[] = [
+  { l: '정면', t: 'mint', hasLabel: true },
+  { l: '측면', t: 'sage', hasLabel: true },
+  { l: '내부', t: 'cool', hasLabel: true },
+  { l: '흠집', t: 'sand', hasLabel: true },
+  { l: '뒷면', t: 'stone', hasLabel: true },
+  { l: '제품번호', t: 'cream', hasLabel: true },
 ]
 
 const TONE_CYCLE: Tone[] = ['mint', 'sage', 'cool', 'sand', 'stone', 'cream']
@@ -38,6 +39,7 @@ interface Thumb {
   l: string
   t: Tone
   url?: string
+  hasLabel: boolean
 }
 
 const thumbs = computed<Thumb[]>(() => {
@@ -47,8 +49,11 @@ const thumbs = computed<Thumb[]>(() => {
     l: img.label ?? `사진 ${i + 1}`,
     t: TONE_CYCLE[i % TONE_CYCLE.length] as Tone,
     url: img.url,
+    hasLabel: !!img.label,
   }))
 })
+
+const hasRealImages = computed(() => vm.images.value.length > 0)
 
 const grades = [
   { g: 'A', t: '거의 새 것 같은 상태, 사용감 미미' },
@@ -59,6 +64,40 @@ const grades = [
 const selectedThumb = ref(0)
 const qty = ref(1)
 const toast = ref<string | null>(null)
+
+const lightboxOpen = ref(false)
+let didSwipeMain = false
+
+function stepThumb(delta: number) {
+  const len = thumbs.value.length
+  if (len < 2) return
+  selectedThumb.value = (selectedThumb.value + delta + len) % len
+}
+
+function openLightbox() {
+  if (didSwipeMain) {
+    didSwipeMain = false
+    return
+  }
+  if (!hasRealImages.value) return
+  lightboxOpen.value = true
+}
+
+const mainTouchStartX = ref<number | null>(null)
+function onMainTouchStart(e: TouchEvent) {
+  mainTouchStartX.value = e.touches[0]?.clientX ?? null
+  didSwipeMain = false
+}
+function onMainTouchEnd(e: TouchEvent) {
+  if (mainTouchStartX.value === null) return
+  const endX = e.changedTouches[0]?.clientX ?? mainTouchStartX.value
+  const delta = endX - mainTouchStartX.value
+  if (Math.abs(delta) > 40) {
+    stepThumb(delta > 0 ? -1 : 1)
+    didSwipeMain = true
+  }
+  mainTouchStartX.value = null
+}
 
 const liked = computed(() => (product.value ? wishlist.has(product.value.id) : false))
 function toggleLike() {
@@ -167,7 +206,16 @@ const gradeShort = computed(() => {
     <div class="grid">
       <!-- Gallery -->
       <section class="gallery">
-        <div class="gallery__main">
+        <div
+          class="gallery__main"
+          role="button"
+          tabindex="0"
+          :aria-label="hasRealImages ? '사진 확대 보기' : undefined"
+          @click="openLightbox"
+          @keydown.enter="openLightbox"
+          @touchstart.passive="onMainTouchStart"
+          @touchend.passive="onMainTouchEnd"
+        >
           <ProductTile
             :kind="product.kind"
             :tone="thumbs[selectedThumb]!.t"
@@ -176,17 +224,61 @@ const gradeShort = computed(() => {
             radius="20px"
             :show-label="false"
           />
-          <div class="gallery__counter">
-            {{ selectedThumb + 1 }} / {{ thumbs.length }}
+
+          <div v-if="thumbs[selectedThumb]?.hasLabel" class="gallery__label">
+            {{ thumbs[selectedThumb]!.l }}
           </div>
+
+          <button
+            v-if="hasRealImages"
+            type="button"
+            class="gallery__zoom"
+            aria-label="사진 확대 보기"
+            @click.stop="openLightbox"
+          >
+            <IconBase name="search" :size="16" />
+          </button>
+
+          <template v-if="thumbs.length > 1">
+            <button
+              type="button"
+              class="gallery__nav gallery__nav--prev"
+              aria-label="이전 사진"
+              @click.stop="stepThumb(-1)"
+            >
+              <IconBase name="chevronLeft" :size="18" />
+            </button>
+            <button
+              type="button"
+              class="gallery__nav gallery__nav--next"
+              aria-label="다음 사진"
+              @click.stop="stepThumb(1)"
+            >
+              <IconBase name="chevronRight" :size="18" />
+            </button>
+
+            <div class="gallery__dots">
+              <button
+                v-for="(t, i) in thumbs"
+                :key="i"
+                type="button"
+                class="dot"
+                :class="{ 'dot--active': selectedThumb === i }"
+                :aria-label="`${i + 1}번째 사진`"
+                @click.stop="selectedThumb = i"
+              />
+            </div>
+          </template>
         </div>
-        <div class="gallery__thumbs rekit-no-scrollbar">
+
+        <div v-if="thumbs.length > 1" class="gallery__thumbs rekit-no-scrollbar">
           <button
             v-for="(th, i) in thumbs"
-            :key="th.l"
+            :key="i"
             type="button"
             class="thumb"
             :class="{ 'thumb--active': selectedThumb === i }"
+            :aria-label="th.hasLabel ? th.l : `${i + 1}번째 사진`"
             @click="selectedThumb = i"
           >
             <ProductTile
@@ -197,10 +289,16 @@ const gradeShort = computed(() => {
               radius="10px"
               :show-label="false"
             />
-            <span class="thumb__label">{{ th.l }}</span>
           </button>
         </div>
       </section>
+
+      <ImageLightbox
+        v-model="selectedThumb"
+        :open="lightboxOpen"
+        :images="thumbs.map((t) => ({ url: t.url, label: t.l }))"
+        @close="lightboxOpen = false"
+      />
 
       <!-- Info -->
       <section class="info">
@@ -461,53 +559,116 @@ const gradeShort = computed(() => {
 /* gallery */
 .gallery__main {
   position: relative;
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.04), 0 10px 28px rgba(20, 20, 15, 0.07);
+  cursor: pointer;
 }
-.gallery__counter {
+.gallery__main:focus-visible {
+  outline: 2px solid var(--rekit-ink);
+  outline-offset: 3px;
+}
+.gallery__label {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  padding: 6px 12px;
+  bottom: 14px;
+  left: 14px;
+  padding: 5px 11px;
   border-radius: 999px;
-  background: rgba(26, 26, 23, 0.7);
+  background: rgba(26, 26, 23, 0.65);
   color: #fff;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
 }
+.gallery__zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(26, 26, 23, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+.gallery__zoom:hover {
+  background: rgba(26, 26, 23, 0.75);
+}
+.gallery__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--rekit-ink);
+  box-shadow: 0 2px 8px rgba(20, 20, 15, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+.gallery__nav:hover {
+  background: #fff;
+}
+.gallery__nav--prev {
+  left: 12px;
+}
+.gallery__nav--next {
+  right: 12px;
+}
+.gallery__dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(20, 20, 15, 0.08);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+.dot--active {
+  width: 18px;
+  background: var(--rekit-accent);
+}
+
 .gallery__thumbs {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
   overflow-x: auto;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .thumb {
-  flex: 0 0 64px;
-  width: 64px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
+  flex: 0 0 68px;
+  width: 68px;
+  padding: 0;
   border-radius: 12px;
   border: 2px solid transparent;
   background: transparent;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.thumb:hover {
+  opacity: 0.85;
 }
 .thumb--active {
-  border-color: var(--rekit-ink);
-}
-.thumb__label {
-  font-size: 10px;
-  color: var(--rekit-ink-muted);
-  font-weight: 500;
+  opacity: 1;
+  border-color: var(--rekit-accent);
 }
 @media (min-width: 1024px) {
-  .gallery__thumbs {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-  }
   .thumb {
-    flex: initial;
-    width: auto;
+    flex: 0 0 72px;
+    width: 72px;
   }
 }
 

@@ -111,3 +111,20 @@ export function replaceProductImages(
     auth: true,
   })
 }
+
+export interface AdminProductImageUpdate {
+  url?: string | null
+  label?: string | null
+}
+
+export function updateProductImage(
+  productId: number,
+  imageId: number,
+  patch: AdminProductImageUpdate,
+): Promise<AdminProductDetailResponse> {
+  return apiRequest<AdminProductDetailResponse>(`/admin/products/${productId}/images/${imageId}`, {
+    method: 'PATCH',
+    body: patch,
+    auth: true,
+  })
+}

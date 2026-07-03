@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
+import ProductImageEditor, { type EditableImage } from '@/components/admin/ProductImageEditor.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
 import IconBase from '@/components/ds/IconBase.vue'
@@ -42,6 +43,7 @@ const original = ref('')
 const price = ref('')
 const stock = ref('1')
 const visibility = ref<'public' | 'private'>('public')
+const images = ref<EditableImage[]>([])
 
 const discountPct = computed(() => calcDiscountPct(original.value, price.value))
 
@@ -64,6 +66,9 @@ onMounted(async () => {
     original.value = p.original_price ? p.original_price.toLocaleString('ko-KR') : ''
     stock.value = String(p.stock)
     visibility.value = p.status === 'ACTIVE' ? 'public' : 'private'
+    images.value = [...p.images]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((img) => ({ id: img.id, url: img.url, label: img.label }))
   } catch (err) {
     loadError.value = err instanceof ApiError ? err.message : '상품 정보를 불러오지 못했습니다.'
   } finally {
@@ -217,6 +222,17 @@ async function handleSave() {
               <textarea v-model="stateDesc" class="input textarea" />
             </div>
           </div>
+        </section>
+
+        <section class="card">
+          <header class="card__head"><h3 class="card__title">상품 이미지</h3></header>
+          <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 4장 이상 등록해 주세요</p>
+          <ProductImageEditor
+            v-model:images="images"
+            :product-id="productId"
+            :disabled="saving"
+            @error="(msg) => (saveError = msg)"
+          />
         </section>
 
         <section class="card">

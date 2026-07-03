@@ -84,6 +84,8 @@ Authorization: Bearer <accessToken>
 | `OTP_INVALID` | 422 | OTP 불일치/만료 |
 | `OTP_RATE_LIMITED` | 429 | OTP 발송 한도 초과 |
 | `RATE_LIMITED` | 429 | API 호출 한도 초과 |
+| `PRODUCT_NOT_FOUND` | 404 | (Admin) 상품 없음 |
+| `PRODUCT_IMAGE_NOT_FOUND` | 404 | (Admin) 이미지가 없거나 해당 상품 소유가 아님 |
 
 ### 1.6 페이지네이션
 
@@ -120,7 +122,9 @@ Authorization: Bearer <accessToken>
 | Payments | 5 | PG 연동 (대부분 서버↔PG) |
 | Help | 4 | 공지·FAQ·문의 |
 | Misc | 1 | 우편번호 검색 (외부 SDK 권장) |
-| **합계** | **50** | |
+| Admin — 상품 | 7 | 상품 CRUD + 이미지 관리 (실제 구현됨, §13) |
+| Uploads | 2 | Presigned URL 이미지 업로드 (실제 구현됨, §14) |
+| **합계** | **59** | |
 
 ---
 
@@ -1184,7 +1188,219 @@ await search((result) => {
 
 ---
 
-## 13. 데이터 모델 (요약)
+## 13. Admin — 상품 (이미지 포함)
+
+> 이 섹션은 mock/설계 단계가 아니라 **실제 백엔드 OpenAPI(`GET /openapi.json`, FastAPI)** 를 그대로 옮긴 것이다. 다른 섹션과 두 가지가 다르니 주의:
+> 1. 응답이 §1.3의 `{ data: ... }` 래핑을 따르지 않는다 — **리소스를 그대로 반환**한다.
+> 2. `422` 검증 에러는 §1.3의 `{ error: { code, message } }`가 아니라 FastAPI 기본 포맷 `{ "detail": [{ "loc": [...], "msg": "...", "type": "..." }, ...] }` 이다. `PRODUCT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND` 같은 도메인 에러(404)의 실제 바디 형태는 OpenAPI에 스키마로 명시되어 있지 않으므로, 클라이언트는 두 포맷 모두 방어적으로 처리해야 한다.
+
+**공통**: 전 엔드포인트 `Authorization: Bearer <accessToken>` 필수 (관리자 권한 가정 — 서버 측 role 검증 방식은 미확인, §16 참고).
+
+### 13.1 상품 목록
+
+```
+GET /admin/products
+```
+
+**Query**
+| 파라미터 | 타입 | 설명 |
+|---|---|---|
+| `status` | enum? | `ACTIVE` \| `INACTIVE` \| `SOLD_OUT` |
+| `q` | string? | 검색어 |
+| `page` | int | 기본 1 |
+| `size` | int | 기본 20, 최대 100 |
+
+**Response 200**
+```json
+{
+  "items": [ ...AdminProductDetailResponse ],
+  "meta": { "page": 1, "size": 20, "total": 0, "total_pages": 0 }
+}
+```
+
+### 13.2 상품 등록
+
+```
+POST /admin/products
+```
+
+**Body** (`AdminProductCreate`)
+```json
+{
+  "title": "삼성 양문형 냉장고 384L",
+  "description": "",
+  "category": "REFRIGERATOR",
+  "brand": null,
+  "model_name": null,
+  "year_estimate": null,
+  "condition_grade": "A",
+  "warranty_works": false,
+  "price": 180000,
+  "original_price": null,
+  "weight_kg": null,
+  "width_cm": null,
+  "depth_cm": null,
+  "height_cm": null,
+  "stock": 1,
+  "status": "ACTIVE",
+  "image_urls": []
+}
+```
+| 필드 | 타입 | 비고 |
+|---|---|---|
+| `title` | string | 1~200자, 필수 |
+| `description` | string | 기본 `""` |
+| `category` | string | 1~30자, 필수 |
+| `condition_grade` | enum | `A`\|`B`\|`C`, 필수 |
+| `price` | int | ≥0, 필수 |
+| `stock` | int | ≥0, 기본 1 |
+| `status` | enum | `ACTIVE`\|`INACTIVE`\|`SOLD_OUT`, 기본 `ACTIVE` |
+| `image_urls` | string[]? | 최대 10개. **§14 업로드 플로우로 얻은 `public_url`만 넣을 것** — 등록 시점에 이미지까지 한 번에 지정하는 용도. 등록 후 이미지를 바꾸려면 13.6/13.7 사용 |
+
+**Response 201**: `AdminProductDetailResponse` (13.6 응답 예시와 동일 모델)
+
+### 13.3 상품 상세
+
+```
+GET /admin/products/{product_id}
+```
+**Response 200**: `AdminProductDetailResponse`
+
+### 13.4 상품 수정
+
+```
+PATCH /admin/products/{product_id}
+```
+**Body** (`AdminProductUpdate`): 13.2와 동일 필드, 전부 optional — **보내지 않은 필드는 유지**. `image_urls`는 이 엔드포인트에 없음 (이미지는 13.6/13.7 전용).
+
+**Response 200**: `AdminProductDetailResponse`
+
+### 13.5 상품 삭제
+
+```
+DELETE /admin/products/{product_id}
+```
+**Response 204**
+
+### 13.6 상품 이미지 전체 교체
+
+```
+PUT /admin/products/{product_id}/images
+```
+
+기존 이미지를 전부 삭제하고 요청 목록으로 **원자적 교체**한다.
+- **추가**: 기존 URL + 새 URL을 모두 포함해서 전송
+- **삭제**: 유지할 URL만 포함해서 전송
+- **순서 변경**: 배열 순서 = 노출 순서 (index 0 → `sort_order` 0, 첫 번째 = 대표 이미지)
+- 빈 배열을 보내면 전체 삭제됨
+
+**Body**
+```json
+{
+  "images": [
+    { "url": "https://cdn.rekit.kr/uploads/xxx.jpg", "label": "정면" },
+    { "url": "https://cdn.rekit.kr/uploads/yyy.jpg", "label": null }
+  ]
+}
+```
+`images`: 최대 10개, 각 항목 `url` 필수(1~500자), `label`은 optional/nullable. `url`은 §14 업로드 플로우로 얻은 `public_url`이어야 함(임의 외부 URL 허용 여부는 서버 검증 로직에 따라 다름 — 미확인).
+
+**Response 200** (`AdminProductDetailResponse`, 이미지 배열만 발췌)
+```json
+{
+  "id": 12,
+  "images": [
+    { "id": 101, "url": "https://cdn.rekit.kr/uploads/xxx.jpg", "sort_order": 0, "label": "정면" },
+    { "id": 102, "url": "https://cdn.rekit.kr/uploads/yyy.jpg", "sort_order": 1, "label": null }
+  ]
+}
+```
+
+**Errors**: `PRODUCT_NOT_FOUND` (404)
+
+### 13.7 상품 이미지 단건 수정
+
+```
+PATCH /admin/products/{product_id}/images/{image_id}
+```
+
+이미지 1개의 `url`/`label`만 부분 수정한다 (전체 배열 교체 없이). 보내지 않은 필드는 유지.
+
+**Body**
+```json
+{ "url": null, "label": "측면 흠집" }
+```
+
+**Response 200**: `AdminProductDetailResponse`
+
+**Errors**: `PRODUCT_NOT_FOUND` (404), `PRODUCT_IMAGE_NOT_FOUND` (404) — 이미지가 없거나 해당 상품 소유가 아님
+
+---
+
+## 14. Uploads — 파일 업로드 (Presigned URL)
+
+이미지 업로드는 **백엔드를 경유하지 않는 presigned URL 방식**이다. 파일 바이트를 백엔드로 직접 전송하는 엔드포인트는 없음.
+
+**흐름**
+1. `POST /uploads/presign` 으로 업로드 URL 발급
+2. 클라이언트가 응답의 `upload_url`에 파일 바이트를 **직접 PUT** (스토리지로 바로 전송 — 백엔드 미경유, `Authorization` 헤더를 붙이면 안 되고 응답의 `headers`만 그대로 포함)
+3. `POST /uploads/confirm` 으로 업로드 완료 처리 → 최종 `public_url` 획득
+4. 그 `public_url`을 13.2의 `image_urls` 또는 13.6/13.7의 `url` 값으로 사용
+
+### 14.1 업로드 URL 발급
+
+```
+POST /uploads/presign
+```
+
+**Body**
+```json
+{ "content_type": "image/jpeg", "purpose": "product_image" }
+```
+| 필드 | 타입 | 비고 |
+|---|---|---|
+| `content_type` | enum | `image/jpeg` \| `image/png` \| `image/webp`, 필수 |
+| `purpose` | const | `"product_image"` 고정 (기본값이라 생략 가능) |
+
+**Response 200**
+```json
+{
+  "upload_url": "https://storage.example.com/rekit-uploads/xxx?X-Amz-...",
+  "method": "PUT",
+  "key": "uploads/2026/07/xxx.jpg",
+  "public_url": "https://cdn.rekit.kr/uploads/2026/07/xxx.jpg",
+  "expires_in": 300,
+  "headers": { "Content-Type": "image/jpeg" }
+}
+```
+`headers`에 담긴 값은 2단계 PUT 요청에 **그대로 포함**해야 서명 검증을 통과한다.
+
+### 14.2 업로드 확정
+
+```
+POST /uploads/confirm
+```
+
+**Body**
+```json
+{ "key": "uploads/2026/07/xxx.jpg" }
+```
+
+**Response 200**
+```json
+{
+  "key": "uploads/2026/07/xxx.jpg",
+  "public_url": "https://cdn.rekit.kr/uploads/2026/07/xxx.jpg",
+  "size": 482113,
+  "content_type": "image/jpeg"
+}
+```
+
+confirm 응답의 `public_url`/`size`/`content_type`은 실제 업로드된 파일 기준으로 서버가 검증한 값이다 — presign 응답 값과 다를 수 있으므로 confirm 응답을 최종 값으로 신뢰할 것.
+
+---
+
+## 15. 데이터 모델 (요약)
 
 ### User
 | 필드 | 타입 | 비고 |
@@ -1290,11 +1506,11 @@ id, userId?, topic, email, message, orderId?, status (NEW/IN_PROGRESS/RESOLVED),
 
 ---
 
-## 14. 향후 추가 (admin / 미구현 화면)
+## 16. 향후 추가 (admin / 미구현 화면)
 
 다음 도메인은 클라이언트 미구현 상태이므로 우선순위 낮음:
 
-- **Admin**: `/admin/*` — 대시보드 통계, 상품 등록/수정, 주문 처리, 회원 관리, 매출 정산. 권한 체계 (RBAC) 필요.
+- **Admin**: 상품 CRUD + 이미지 관리는 구현되어 §13에 문서화됨. 남은 것: 대시보드 통계, 주문 처리, 회원 관리, 매출 정산. 권한 체계 (RBAC) 필요 — 현재 프론트엔드 `auth` 스토어에 `role` 필드는 있으나 서버 측 RBAC 검증 여부 미확인.
 - **Seller**: `/sell` 판매자 등록 — 협력 정리업체(폐업 매장 회수 파트너) 입점 신청 폼.
 - **Notifications**: 푸시·SMS·이메일 알림 발송 시스템.
 - **Reviews**: 상품 후기 (디자인 미완)
@@ -1302,7 +1518,7 @@ id, userId?, topic, email, message, orderId?, status (NEW/IN_PROGRESS/RESOLVED),
 
 ---
 
-## 15. 비기능 요구사항
+## 17. 비기능 요구사항
 
 | 항목 | 목표 |
 |---|---|
@@ -1316,8 +1532,9 @@ id, userId?, topic, email, message, orderId?, status (NEW/IN_PROGRESS/RESOLVED),
 
 ---
 
-## 16. 변경 이력
+## 18. 변경 이력
 
 | 일자 | 버전 | 내용 |
 |---|---|---|
 | 2026-05-01 | v1.0 | 초안 — 50개 엔드포인트, 9개 도메인 |
+| 2026-07-03 | v1.1 | 실제 백엔드 OpenAPI(`/openapi.json`) 기준으로 §13 Admin — 상품(이미지 포함), §14 Uploads(Presigned URL) 추가 — 총 59개 엔드포인트, 11개 도메인. 기존 §14(현 §16) "향후 추가"에서 Admin 상품/이미지 항목 제거 |
