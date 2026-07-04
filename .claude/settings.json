@@ -21,7 +21,20 @@
       "Bash(curl -s http://localhost:8000/openapi.json *)",
       "Bash(curl -s http://localhost:8000/*)",
       "Bash(.venv/bin/pytest *)",
-      "Bash(.venv/bin/mypy *)"
+      "Bash(.venv/bin/mypy *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H \"Content-Type: application/json\" -d '{\"name\":\"test\",\"email\":\"test@example.com\",\"title\":\"test title\",\"content\":\"test content\"}' -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"홍길동\",\"email\":\"test@example.com\",\"title\":\"[주문/배송] 배송이 안왔어요\",\"content\":\"자세한 내용입니다.\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"test\",\"email\":\"test@example.com\",\"title\":\"t\",\"content\":\"c\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"test\",\"email\":\"test@example.com\",\"phone\":null,\"title\":\"t\",\"content\":\"c\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"test\",\"email\":\"test@example.com\",\"title\":\"\",\"content\":\"c\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"test\",\"email\":\"not-an-email\",\"title\":\"t\",\"content\":\"c\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"홍길동\",\"email\":\"test@example.com\",\"title\":\"[기타] 문의 테스트\",\"content\":\"문의 테스트입니다. 확인 부탁드려요.\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contacts -H 'Content-Type: application/json' -d '{\"title\":\"테스트 제목\",\"content\":\"문의 테스트입니다. 확인 부탁드려요.\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/help/contact -H 'Content-Type: application/json' -d '{\"name\":\"t\",\"email\":\"t@example.com\",\"title\":\"t\",\"content\":\"1234567890\"}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(curl -s \"http://localhost:8000/api/v1/help/faqs?category=주문\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\")",
+      "Bash(curl -s \"http://localhost:8000/api/v1/help/faqs?category=%EC%A3%BC%EB%AC%B8\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\")",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

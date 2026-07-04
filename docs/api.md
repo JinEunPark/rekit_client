@@ -1131,28 +1131,83 @@ GET /faqs
 ### 11.4 문의 제출
 
 ```
-POST /help/contact
+POST /help/contacts
 ```
 
-**Public** (비로그인도 OK)
+**로그인 필수** (JWT — 없으면 401). 이름/이메일은 클라이언트가 보내지 않으며, 서버가 로그인된 회원 정보에서 자동으로 채운다.
 
 **Body**
 ```json
 {
-  "topic": "주문/배송",
-  "email": "you@example.com",
-  "message": "...",
-  "orderId": null,           // 선택
-  "userId": null              // 로그인 시 자동 채움 (서버가 token에서 추출)
+  "title": "문의 제목 (2~200자)",
+  "content": "문의 내용 (10~3000자)"
 }
 ```
 
-처리: 운영팀 알림 (이메일/슬랙) + DB 저장 + 사용자에게 접수 확인 메일.
+**Response 204**: No Content
 
-**Response 201**
-```json
-{ "data": { "inquiryId": "inq_xxx", "estimatedReplyDays": 2 } }
+**에러**: 401 (미로그인), 422 (길이 제약 위반 — `title` 2~200자, `content` 10~3000자)
+
+### 11.5 내 문의 목록 조회
+
 ```
+GET /help/contacts?page=1&size=20
+```
+
+**로그인 필수** — 본인 문의만 조회된다.
+
+**Response 200**
+```json
+{
+  "items": [
+    { "id": 9, "title": "...", "status": "PENDING", "answered_at": null, "created_at": "2026-07-04T04:24:50Z" }
+  ],
+  "meta": { "page": 1, "size": 20, "total": 1, "total_pages": 1 }
+}
+```
+
+### 11.6 내 문의 상세 조회
+
+```
+GET /help/contacts/{contact_id}
+```
+
+**로그인 필수** — 본인 문의만 조회된다.
+
+**Response 200**
+```json
+{
+  "id": 9, "title": "...", "content": "...",
+  "status": "ANSWERED", "answered_at": "2026-07-04T05:00:00Z",
+  "answer_content": "관리자가 등록한 답변 내용 (없으면 null)",
+  "created_at": "2026-07-04T04:24:50Z"
+}
+```
+
+**에러**: 404 `CONTACT_NOT_FOUND` — 본인 문의가 아니거나 존재하지 않는 경우 동일하게 반환 (존재 여부 비노출).
+
+### 11.7 관리자 — 문의 답변 등록
+
+```
+PATCH /admin/contacts/{contact_id}/answer
+```
+
+**Admin only** (JWT, ADMIN role — 아니면 403 `PERMISSION_DENIED`)
+
+**Body**
+```json
+{ "answer": "답변 내용 (1~3000자)" }
+```
+
+처리: `answer_content` 저장 + `status`를 `ANSWERED`로 전환 + `answered_at` 기록 + 문의자 이메일로 **답변 완료 안내 메일** 발송까지 서버가 한 번에 처리. 클라이언트는 상태값을 별도로 보내지 않는다.
+
+**Response 200**: `AdminContactDetail` (갱신된 `answer_content`, `answered_at`, `status: "ANSWERED"` 반영)
+
+**에러**
+- 404 `CONTACT_NOT_FOUND`
+- 422: `answer`가 빈 문자열이거나 3000자 초과 시 validation error
+
+> 기존 `PATCH /admin/contacts/{contact_id}/status`(`{ "status": "PENDING" }`)는 `ANSWERED → PENDING` 되돌리기 전용으로 유지. `answer_content`는 지워지지 않고 유지되며 `answered_at`만 `null`로 초기화된다. 이 경우 메일은 발송하지 않는다.
 
 ---
 
@@ -1502,7 +1557,7 @@ id, title, body (markdown), tag, publishedAt, updatedAt
 id, category, question, answer, order
 
 ### ContactInquiry
-id, userId?, topic, email, message, orderId?, status (NEW/IN_PROGRESS/RESOLVED), createdAt, repliedAt?
+id, user_id, title, content, status (PENDING/ANSWERED), answer_content?, answered_at?, created_at
 
 ---
 

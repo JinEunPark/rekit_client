@@ -16,7 +16,15 @@ export function setAccessToken(token: string | null): void {
 export interface ApiErrorBody {
   code?: string
   message?: string
+  /** Per-field validation errors, e.g. FastAPI's `{"title": "too short", ...}`. */
+  fields?: Record<string, string>
   details?: unknown
+}
+
+function buildErrorMessage(body: ApiErrorBody | null, fallback: string): string {
+  const fieldDetail = body?.fields ? Object.values(body.fields).join(' ') : ''
+  if (!fieldDetail) return body?.message ?? fallback
+  return body?.message ? `${body.message} (${fieldDetail})` : fieldDetail
 }
 
 export class ApiError extends Error {
@@ -25,7 +33,7 @@ export class ApiError extends Error {
   body: ApiErrorBody | null
 
   constructor(status: number, body: ApiErrorBody | null, fallbackMessage: string) {
-    super(body?.message ?? fallbackMessage)
+    super(buildErrorMessage(body, fallbackMessage))
     this.status = status
     this.code = body?.code ?? 'HTTP_ERROR'
     this.body = body

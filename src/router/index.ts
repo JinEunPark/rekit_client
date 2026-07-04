@@ -24,6 +24,8 @@ const router = createRouter({
     { path: '/my/addresses', name: 'my-addresses', component: () => import('../views/my/AddressesView.vue') },
     { path: '/my/profile', name: 'my-profile', component: () => import('../views/my/ProfileView.vue') },
     { path: '/my/password', name: 'my-password', component: () => import('../views/my/ChangePasswordView.vue') },
+    { path: '/my/contacts', name: 'my-contacts', component: () => import('../views/my/ContactsView.vue') },
+    { path: '/my/contacts/:id', name: 'my-contact-detail', component: () => import('../views/my/ContactDetailView.vue') },
 
     // Products
     { path: '/products', name: 'products', component: () => import('../views/products/ListView.vue') },
@@ -48,6 +50,7 @@ const router = createRouter({
     { path: '/help/faq', name: 'help-faq', component: () => import('../views/help/FaqView.vue') },
     { path: '/help/contact', name: 'help-contact', component: () => import('../views/help/ContactView.vue') },
     { path: '/help/notice', name: 'help-notice', component: () => import('../views/help/NoticeView.vue') },
+    { path: '/help/notice/:id', name: 'help-notice-detail', component: () => import('../views/help/NoticeDetailView.vue') },
 
     // Legal
     { path: '/legal/terms', name: 'legal-terms', component: () => import('../views/legal/TermsView.vue') },
@@ -62,6 +65,7 @@ const router = createRouter({
     { path: '/admin/orders', name: 'admin-orders', component: () => import('../views/admin/OrdersView.vue') },
     { path: '/admin/members', name: 'admin-members', component: () => import('../views/admin/MembersView.vue') },
     { path: '/admin/sales', name: 'admin-sales', component: () => import('../views/admin/SalesView.vue') },
+    { path: '/admin/help', name: 'admin-help', component: () => import('../views/admin/HelpView.vue') },
 
     // ========== DESIGN REFERENCE ==========
     // Faithful Vue ports of the original design canvas screens.

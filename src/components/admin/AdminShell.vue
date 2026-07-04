@@ -13,6 +13,7 @@ const nav = [
   { id: 'orders' as const, to: '/admin/orders', i: 'cart' as IconName, t: '주문 관리' },
   { id: 'members' as const, to: '/admin/members', i: 'user' as IconName, t: '회원 관리' },
   { id: 'sales' as const, to: '/admin/sales', i: 'wallet' as IconName, t: '매출 / 정산' },
+  { id: 'help' as const, to: '/admin/help', i: 'bell' as IconName, t: '고객센터' },
 ]
 type NavId = (typeof nav)[number]['id']
 

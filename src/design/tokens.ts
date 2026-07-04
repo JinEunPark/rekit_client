@@ -40,3 +40,17 @@ export const REKIT = {
 } as const
 
 export const won = (n: number) => n.toLocaleString('ko-KR') + '원'
+
+/** `YYYY.MM.DD` — falls back to the raw input if it isn't a valid date. */
+export function formatDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** `YYYY.MM.DD HH:MM` — falls back to the raw input if it isn't a valid date. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${formatDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}

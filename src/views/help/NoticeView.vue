@@ -1,40 +1,26 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import StaticPage from '@/components/layout/StaticPage.vue'
 import Badge from '@/components/ds/Badge.vue'
+import { getNotices, type NoticeListItem } from '@/api/help'
+import { ApiError } from '@/api/client'
+import { formatDate } from '@/design/tokens'
 
-const notices: { date: string; tag?: string; tone?: 'accent' | 'info'; t: string; b: string }[] = [
-  {
-    date: '2026.04.30',
-    tag: '이벤트',
-    tone: 'accent',
-    t: '5월 한정, 직배송비 50% 할인',
-    b: '5월 한 달 동안 서울·경기 직배송비를 절반 가격으로 제공합니다.',
-  },
-  {
-    date: '2026.04.22',
-    tag: '서비스',
-    tone: 'info',
-    t: '환불 신청 절차가 더 간단해졌어요',
-    b: '주문 상세에서 사진 첨부 후 한 번에 신청, 24시간 내 회신을 약속드립니다.',
-  },
-  {
-    date: '2026.04.15',
-    t: '신규 카테고리 — 주방가전 입점',
-    b: '전자레인지·인덕션·식기세척기 등 주방가전이 정식 카테고리로 추가됐어요.',
-  },
-  {
-    date: '2026.04.04',
-    tag: '점검',
-    tone: 'info',
-    t: '4월 9일(목) 새벽 3~5시 정기 점검 안내',
-    b: '서비스 일부가 일시 중단될 수 있습니다. 이용에 참고 부탁드려요.',
-  },
-  {
-    date: '2026.03.28',
-    t: '협력 정리업체 모집',
-    b: '서울·수도권 폐업 매장의 영업용 가전을 다시 살릴 파트너 정리업체를 찾고 있어요.',
-  },
-]
+const notices = ref<NoticeListItem[]>([])
+const loading = ref(true)
+const errorMessage = ref('')
+
+onMounted(async () => {
+  try {
+    const res = await getNotices(1, 50)
+    notices.value = res.items
+  } catch (err) {
+    errorMessage.value = err instanceof ApiError ? err.message : '공지사항을 불러오지 못했습니다.'
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
@@ -43,20 +29,35 @@ const notices: { date: string; tag?: string; tone?: 'accent' | 'info'; t: string
     title="공지사항"
     lead="rekit의 새 소식과 서비스 변경 사항을 안내드려요."
   >
-    <ul class="notices">
-      <li v-for="(n, i) in notices" :key="i" class="notice">
-        <div class="notice__head">
-          <span class="notice__date">{{ n.date }}</span>
-          <Badge v-if="n.tag" :tone="n.tone ?? 'neutral'" size="xs">{{ n.tag }}</Badge>
-        </div>
-        <div class="notice__title">{{ n.t }}</div>
-        <p class="notice__body">{{ n.b }}</p>
+    <div v-if="loading" class="state">불러오는 중…</div>
+    <div v-else-if="errorMessage" class="state state--error">{{ errorMessage }}</div>
+    <div v-else-if="notices.length === 0" class="state">등록된 공지사항이 없습니다.</div>
+
+    <ul v-else class="notices">
+      <li v-for="n in notices" :key="n.id" class="notice">
+        <RouterLink :to="`/help/notice/${n.id}`" class="notice__link">
+          <div class="notice__head">
+            <span class="notice__date">{{ formatDate(n.created_at) }}</span>
+            <Badge v-if="n.is_pinned" tone="accent" size="xs">고정</Badge>
+          </div>
+          <div class="notice__title">{{ n.title }}</div>
+        </RouterLink>
       </li>
     </ul>
   </StaticPage>
 </template>
 
 <style scoped>
+.state {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--rekit-ink-subtle);
+  font-size: 13.5px;
+}
+.state--error {
+  color: var(--rekit-danger);
+}
+
 .notices {
   list-style: none;
   padding: 0;
@@ -69,7 +70,12 @@ const notices: { date: string; tag?: string; tone?: 'accent' | 'info'; t: string
   background: var(--rekit-surface);
   border: 1px solid var(--rekit-border);
   border-radius: 14px;
+}
+.notice__link {
+  display: block;
   padding: 18px 20px;
+  text-decoration: none;
+  color: inherit;
 }
 .notice__head {
   display: flex;
@@ -87,11 +93,5 @@ const notices: { date: string; tag?: string; tone?: 'accent' | 'info'; t: string
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.015em;
-}
-.notice__body {
-  margin: 4px 0 0;
-  font-size: 13.5px;
-  color: var(--rekit-ink-muted);
-  line-height: 1.6;
 }
 </style>

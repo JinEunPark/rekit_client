@@ -22,7 +22,7 @@ const menus: { i: IconName; t: string; n?: string; tone?: 'accent'; to: string }
   { i: 'map', t: '배송지 관리', n: '2', to: '/my/addresses' },
   { i: 'shield', t: '본인인증 상태', n: '인증완료', tone: 'accent', to: '/my/profile' },
   { i: 'info', t: '공지사항', to: '/help/notice' },
-  { i: 'mail', t: '문의하기', to: '/help/contact' },
+  { i: 'mail', t: '내 문의내역', to: '/my/contacts' },
 ]
 
 function logout() {
