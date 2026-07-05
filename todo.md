@@ -1,4 +1,4 @@
-# rekit — 작업 현황 (2026-07-04 기준)
+# rekit — 작업 현황 (2026-07-06 기준)
 
 > 디자인 시안(`/_design/*`)을 레퍼런스로 두고, 실제 반응형 웹앱 + 백엔드 API 연동 진행 중.
 
@@ -52,6 +52,9 @@
 - ✅ `/admin/sales` — 기간 선택, 매출 라인차트, 결제수단별, 상위 상품, CSV (API 연동)
 - ✅ `/admin/categories` — 카테고리 CRUD (목록·추가·인라인 수정·삭제)
 - ✅ `/admin/help` — 고객센터 관리 (공지사항/FAQ CRUD + 1:1 문의 목록·상세·답변 등록/수정, 답변 등록 시 이메일 자동 발송)
+- ✅ `/admin/orders/:orderNumber` — 주문 상세 뷰 신규 (주문자/배송지/상품(썸네일·브랜드·모델명·수량·소계)/결제/배송 정보 + 준비시작·송장입력·취소 액션)
+- ✅ `/admin/members/:id` — 회원 상세 뷰 신규 (기본정보/구매활동/인증상태)
+- ✅ 상품 이미지 드래그 앤 드롭 순서변경 (기존 화살표 버튼과 병행 — 키보드 접근성 유지)
 
 ### API 연동 완료 목록
 - ✅ Auth: sign-in/up/out, refresh, find-id, find-password, social callback
@@ -61,9 +64,9 @@
 - ✅ Wishlist: `GET/POST/DELETE /wishlist/:id`
 - ✅ Addresses: 목록·추가·수정·삭제·기본설정 전체
 - ✅ Orders (구매자): 목록·상세
-- ✅ Admin Orders: 목록·상태변경·송장입력·취소·CSV
+- ✅ Admin Orders: 목록·상세·상태변경·송장입력·취소·CSV
 - ✅ Admin Products: 목록·상세·등록·수정·삭제
-- ✅ Admin Members: 요약·목록·상태변경
+- ✅ Admin Members: 요약·목록·상세·상태변경
 - ✅ Admin Dashboard: 요약·차트·대기주문·인기카테고리·재고알림
 - ✅ Admin Sales: 요약·타임시리즈·결제수단별·상위상품·CSV
 - ✅ Admin Categories: 목록·추가·수정·삭제
@@ -92,16 +95,11 @@
 - [ ] 입금 확인 액션 추가 — 기존 `updateAdminOrderStatus(orderNumber, 'PAID')` 재사용 가능한지 백엔드 확인 후 버튼 연결
 - [ ] `docs/api.md` §10 Payments를 PG 연동 스펙 → 계좌이체 확인 플로우로 최신화 (현재 문서와 실제 구현이 어긋나 있음)
 
-### P2 — Admin 미완성 기능
-- [ ] 주문 상세 뷰 — `GET /admin/orders/:orderNumber` (`OrdersView`의 "상세보기"가 현재 텍스트 라벨일 뿐, 링크 없음)
-- [ ] 회원 상세 뷰 — `GET /admin/members/:id` (라우트 없음)
-- [ ] Admin 상품 등록/수정에서 이미지 순서 변경 UI (드래그 정렬 등 — 현재 미구현)
-
-### P3 — 마이페이지 잔여 항목
+### P2 — 마이페이지 잔여 항목
 - [ ] 배송 조회 버튼 — `src/views/my/OrdersView.vue`, `src/views/my/MyView.vue`의 "배송조회" 버튼이 현재 클릭 핸들러 없는 no-op. `GET /orders/:id/tracking` 연동 필요
 - [ ] `src/views/my/MyView.vue` "최근 주문" 섹션이 하드코딩된 텍스트("삼성 양문형 냉장고 384L 외 2건") — 실제 주문 스토어 데이터로 교체 필요
 
-### P4 — 품질 / 마무리
+### P3 — 품질 / 마무리
 - [ ] `/help/contact` 문의 내용(content) 3000자 상한이 서버(422)만 강제 중 — `CONTACT_CONTENT_MAX_LENGTH`를 `src/api/help.ts`에 추가하고 textarea에 `maxlength` 적용 필요 (title/content min은 이미 클라이언트에서 검증 중)
 - [ ] 폼 검증 강화 (`vee-validate` + `zod` 또는 inline 유지 결정)
 - [ ] 글로벌 Toast / 에러 바운더리 (현재 view마다 actionError ref)
