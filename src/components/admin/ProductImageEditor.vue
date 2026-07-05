@@ -33,6 +33,40 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const uploadingCount = ref(0)
 const isUploading = computed(() => uploadingCount.value > 0)
 
+const dragIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+function onDragStart(index: number, e: DragEvent) {
+  if (props.disabled) return
+  dragIndex.value = index
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+function onDragEnter(index: number) {
+  if (dragIndex.value === null) return
+  dragOverIndex.value = index
+}
+
+function onDragEnd() {
+  dragIndex.value = null
+  dragOverIndex.value = null
+}
+
+async function onDrop(index: number) {
+  const from = dragIndex.value
+  dragIndex.value = null
+  dragOverIndex.value = null
+  if (from === null || from === index) return
+  const next = [...props.images]
+  const [moved] = next.splice(from, 1)
+  if (!moved) return
+  next.splice(index, 0, moved)
+  await persist(next)
+}
+
 function openPicker() {
   if (props.disabled || props.images.length >= props.max) return
   fileInput.value?.click()
@@ -135,7 +169,18 @@ async function commitLabel(index: number) {
 <template>
   <div class="pie">
     <div class="pie__grid">
-      <div v-for="(img, i) in images" :key="`${img.url}-${i}`" class="pie__tile">
+      <div
+        v-for="(img, i) in images"
+        :key="`${img.url}-${i}`"
+        class="pie__tile"
+        :class="{ 'pie__tile--dragging': dragIndex === i, 'pie__tile--drop-target': dragOverIndex === i && dragIndex !== null && dragIndex !== i }"
+        :draggable="!disabled && images.length > 1"
+        @dragstart="onDragStart(i, $event)"
+        @dragenter.prevent="onDragEnter(i)"
+        @dragover.prevent
+        @drop.prevent="onDrop(i)"
+        @dragend="onDragEnd"
+      >
         <div class="pie__imgbox">
           <img :src="img.url" :alt="img.label || `상품 이미지 ${i + 1}`" class="pie__img" />
           <span v-if="i === 0" class="pie__primary">대표</span>
@@ -205,7 +250,7 @@ async function commitLabel(index: number) {
     <div class="pie__hint">
       <IconBase name="info" :size="14" />
       <span>
-        최소 {{ min }}장 / 최대 {{ max }}장 · 5MB 이하 · JPG, PNG, WEBP · 첫 번째 이미지가 대표 이미지로 노출됩니다
+        최소 {{ min }}장 / 최대 {{ max }}장 · 5MB 이하 · JPG, PNG, WEBP · 첫 번째 이미지가 대표 이미지로 노출됩니다 · 이미지를 드래그해서 순서를 바꿀 수 있어요
         <template v-if="images.length < min">· 현재 {{ images.length }}장 ({{ min - images.length }}장 더 필요)</template>
       </span>
     </div>
@@ -222,6 +267,12 @@ async function commitLabel(index: number) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.pie__tile[draggable='true'] { cursor: grab; }
+.pie__tile--dragging { opacity: 0.4; }
+.pie__tile--drop-target .pie__imgbox {
+  outline: 2px solid var(--rekit-accent);
+  outline-offset: 2px;
 }
 .pie__imgbox {
   position: relative;

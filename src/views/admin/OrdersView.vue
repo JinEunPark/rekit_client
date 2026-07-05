@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Button from '@/components/ds/Button.vue'
 import Badge from '@/components/ds/Badge.vue'
@@ -148,10 +149,10 @@ onMounted(load)
         }"
       >
         <span class="cb" />
-        <div>
+        <RouterLink :to="`/admin/orders/${o.order_number}`" class="id-cell">
           <div class="id">{{ o.order_number }}</div>
           <div class="date">{{ formatDate(o.created_at) }}</div>
-        </div>
+        </RouterLink>
         <div>
           <div class="name">{{ o.username }}</div>
           <div class="phone">{{ o.recipient_phone }}</div>
@@ -189,7 +190,7 @@ onMounted(load)
           >
             취소
           </Button>
-          <span v-else class="action__view">상세보기</span>
+          <RouterLink v-else :to="`/admin/orders/${o.order_number}`" class="action__view">상세보기</RouterLink>
         </span>
       </div>
       <div v-if="!loading && orders.length === 0" class="empty">
@@ -337,6 +338,12 @@ onMounted(load)
   border-radius: 4px;
   border: 1.5px solid var(--rekit-border-strong);
 }
+.id-cell {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.id-cell:hover .id { color: var(--rekit-accent-deep); }
 .id {
   font-family: var(--rekit-font-mono);
   font-size: 12px;
@@ -360,7 +367,9 @@ onMounted(load)
   font-size: 12px;
   color: var(--rekit-ink-subtle);
   font-weight: 600;
+  text-decoration: none;
 }
+.action__view:hover { color: var(--rekit-ink); }
 .empty {
   padding: 40px 16px;
   text-align: center;

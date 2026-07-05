@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
@@ -12,6 +13,7 @@ import {
 } from '@/api/admin/members'
 import type { AdminMemberItem, AdminMemberSummary, UserStatus } from '@/api/admin/members'
 import { ApiError } from '@/api/client'
+import { statusTone, statusLabel } from '@/stores/members-helpers'
 
 const summary = ref<AdminMemberSummary | null>(null)
 const members = ref<AdminMemberItem[]>([])
@@ -59,15 +61,6 @@ async function toggleStatus(m: AdminMemberItem) {
   } catch (err) {
     actionError.value = err instanceof ApiError ? err.message : '상태 변경 중 오류가 발생했습니다.'
   }
-}
-
-function statusTone(s: UserStatus): 'accent' | 'danger' | 'neutral' {
-  return s === 'ACTIVE' ? 'accent' : s === 'BANNED' ? 'danger' : 'neutral'
-}
-
-function statusLabel(s: UserStatus): string {
-  const map: Record<UserStatus, string> = { ACTIVE: '활성', BANNED: '제재', DORMANT: '휴면', WITHDRAWN: '탈퇴' }
-  return map[s]
 }
 
 function formatDate(iso: string): string {
@@ -121,7 +114,7 @@ onMounted(async () => {
         class="table__row"
         :class="{ 'table__row--first': i === 0 }"
       >
-        <div class="name">{{ m.username }}</div>
+        <RouterLink :to="`/admin/members/${m.id}`" class="name">{{ m.username }}</RouterLink>
         <div class="email">{{ m.email }}</div>
         <div class="phone">{{ m.phone ?? '—' }}</div>
         <Badge :tone="m.verified ? 'accent' : 'neutral'" size="sm">{{ m.verified ? '완료' : '미완' }}</Badge>
@@ -244,7 +237,8 @@ onMounted(async () => {
   border-top: 1px solid var(--rekit-border);
 }
 .table__row--first { border-top: 0; }
-.name { font-weight: 600; }
+.name { font-weight: 600; text-decoration: none; color: inherit; }
+.name:hover { color: var(--rekit-accent-deep); }
 .email,
 .phone {
   font-size: 12px;

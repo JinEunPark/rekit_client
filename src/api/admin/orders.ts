@@ -29,7 +29,11 @@ export interface AdminOrderListResponse {
 }
 
 export interface AdminOrderItemSummary {
+  product_id: number
   product_title_snapshot: string
+  product_brand_snapshot: string | null
+  product_model_name_snapshot: string | null
+  product_image_url_snapshot: string | null
   quantity: number
   price_snapshot: number
 }

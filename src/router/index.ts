@@ -63,7 +63,9 @@ const router = createRouter({
     { path: '/admin/products/:id/edit', name: 'admin-product-edit', component: () => import('../views/admin/ProductEditView.vue') },
     { path: '/admin/categories', name: 'admin-categories', component: () => import('../views/admin/CategoriesView.vue') },
     { path: '/admin/orders', name: 'admin-orders', component: () => import('../views/admin/OrdersView.vue') },
+    { path: '/admin/orders/:orderNumber', name: 'admin-order-detail', component: () => import('../views/admin/OrderDetailView.vue') },
     { path: '/admin/members', name: 'admin-members', component: () => import('../views/admin/MembersView.vue') },
+    { path: '/admin/members/:id', name: 'admin-member-detail', component: () => import('../views/admin/MemberDetailView.vue') },
     { path: '/admin/sales', name: 'admin-sales', component: () => import('../views/admin/SalesView.vue') },
     { path: '/admin/help', name: 'admin-help', component: () => import('../views/admin/HelpView.vue') },
 

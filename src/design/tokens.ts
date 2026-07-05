@@ -54,3 +54,11 @@ export function formatDateTime(iso: string): string {
   if (Number.isNaN(d.getTime())) return iso
   return `${formatDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+
+/**
+ * Order/cart line-item breakdown. Omits the unit price when quantity is 1 —
+ * it would just repeat the subtotal shown alongside it.
+ */
+export function formatLineItemCalc(price: number, quantity: number): string {
+  return quantity > 1 ? `${won(price)} × ${quantity}개` : `수량 ${quantity}개`
+}

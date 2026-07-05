@@ -34,7 +34,18 @@
       "Bash(curl -s \"http://localhost:8000/api/v1/help/faqs?category=주문\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\")",
       "Bash(curl -s \"http://localhost:8000/api/v1/help/faqs?category=%EC%A3%BC%EB%AC%B8\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\")",
       "Bash(npx eslint *)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(curl -s \"http://localhost:8000/*)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Volumes/A/web_projects/rekle/.claude/settings.json'\\)\\); print\\('valid JSON'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(/Volumes/A/web_projects/rekle_backend/.venv/bin/python3 -c ' *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/sign-in -H \"Content-Type: application/json\" -d '{\"loginId\":\"admin\",\"password\":\"Test1234!\"}' -w \"\\\\nHTTP:%{http_code}\\\\n\")",
+      "Bash(NODE_PATH=/Users/bagjin-eun/.npm/_npx/e41f203b7505f1fb/node_modules node /private/tmp/claude-501/-Volumes-A-web-projects-rekle/aae4f743-7d34-44ce-a6c6-d344854f67cf/scratchpad/check_order_detail.mjs)",
+      "Bash(ln -sf /Users/bagjin-eun/.npm/_npx/e41f203b7505f1fb/node_modules /private/tmp/claude-501/-Volumes-A-web-projects-rekle/aae4f743-7d34-44ce-a6c6-d344854f67cf/scratchpad/node_modules)",
+      "Bash(node /private/tmp/claude-501/-Volumes-A-web-projects-rekle/aae4f743-7d34-44ce-a6c6-d344854f67cf/scratchpad/check_order_detail.mjs)",
+      "Bash(node /private/tmp/claude-501/-Volumes-A-web-projects-rekle/aae4f743-7d34-44ce-a6c6-d344854f67cf/scratchpad/debug_check.mjs)",
+      "Bash(node /private/tmp/claude-501/-Volumes-A-web-projects-rekle/aae4f743-7d34-44ce-a6c6-d344854f67cf/scratchpad/check_link.mjs)"
     ]
   }
 }
