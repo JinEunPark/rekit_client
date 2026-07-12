@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { won } from '@/design/tokens'
-import { discountPct, type Product } from '@/data/products'
+import { discountPct, isSoldOut, type Product } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
@@ -19,6 +19,7 @@ const props = withDefaults(
 
 const wishlist = useWishlistStore()
 const liked = computed(() => wishlist.has(props.product.id))
+const soldOut = computed(() => isSoldOut(props.product))
 
 function toggleLike() {
   wishlist.toggle(props.product.id)
@@ -26,7 +27,7 @@ function toggleLike() {
 </script>
 
 <template>
-  <RouterLink :to="`/products/${product.id}`" class="card">
+  <RouterLink :to="`/products/${product.id}`" class="card" :class="{ 'card--soldout': soldOut }">
     <div class="card__media">
       <ProductTile
         :kind="product.kind"
@@ -35,6 +36,9 @@ function toggleLike() {
         :image-url="product.thumbnailUrl"
         ratio="1/1"
       />
+      <div v-if="soldOut" class="card__soldout">
+        <Badge tone="dark" size="sm" :style="{ fontWeight: 700 }">품절</Badge>
+      </div>
       <button
         type="button"
         class="card__heart"
@@ -76,6 +80,21 @@ function toggleLike() {
 
 .card__media {
   position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.card__soldout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 26, 23, 0.45);
+}
+
+.card--soldout .card__body {
+  opacity: 0.5;
 }
 
 .card__heart {

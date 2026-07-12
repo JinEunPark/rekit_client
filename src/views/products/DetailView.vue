@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
-import { discountPct, type Tone } from '@/data/products'
+import { discountPct, isSoldOut, type Tone } from '@/data/products'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
@@ -99,6 +99,8 @@ function onMainTouchEnd(e: TouchEvent) {
   mainTouchStartX.value = null
 }
 
+const soldOut = computed(() => (product.value ? isSoldOut(product.value) : false))
+
 const liked = computed(() => (product.value ? wishlist.has(product.value.id) : false))
 function toggleLike() {
   if (product.value) wishlist.toggle(product.value.id)
@@ -153,13 +155,13 @@ function showToast(msg: string) {
 }
 
 function addToCart() {
-  if (!product.value) return
+  if (!product.value || soldOut.value) return
   cart.add(product.value.id, qty.value)
   showToast(`장바구니에 ${qty.value}개 담았어요`)
 }
 
 function buyNow() {
-  if (!product.value) return
+  if (!product.value || soldOut.value) return
   cart.add(product.value.id, qty.value)
   router.push('/cart')
 }
@@ -303,6 +305,7 @@ const gradeShort = computed(() => {
       <!-- Info -->
       <section class="info">
         <div class="info__badges">
+          <Badge v-if="soldOut" tone="dark" size="md" :style="{ fontWeight: '700' }">품절</Badge>
           <Badge :tone="gradeTone" size="md" :style="{ fontWeight: '700' }">
             {{ product.grade }}급 · {{ gradeShort }}
           </Badge>
@@ -333,7 +336,7 @@ const gradeShort = computed(() => {
             <button type="button" :disabled="qty <= 1" @click="dec" aria-label="수량 감소">
               <IconBase name="minus" :size="14" />
             </button>
-            <span class="qty__n">{{ qty }}</span>
+            <span class="qty__n">{{ soldOut ? 0 : qty }}</span>
             <button
               type="button"
               :disabled="qty >= product.stock"
@@ -356,11 +359,23 @@ const gradeShort = computed(() => {
           >
             <IconBase name="heart" :size="22" />
           </button>
-          <Button variant="secondary" size="lg" :style="{ flex: '1' }" @click="addToCart">
+          <Button
+            variant="secondary"
+            size="lg"
+            :style="{ flex: '1' }"
+            :disabled="soldOut"
+            @click="addToCart"
+          >
             장바구니
           </Button>
-          <Button variant="accent" size="lg" :style="{ flex: '1.3' }" @click="buyNow">
-            바로 구매
+          <Button
+            variant="accent"
+            size="lg"
+            :style="{ flex: '1.3' }"
+            :disabled="soldOut"
+            @click="buyNow"
+          >
+            {{ soldOut ? '품절된 상품이에요' : '바로 구매' }}
           </Button>
         </div>
       </section>

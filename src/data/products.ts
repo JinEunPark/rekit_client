@@ -43,3 +43,4 @@ export const CATEGORIES = [
 ]
 
 export const discountPct = (p: Product) => Math.round((1 - p.price / p.original) * 100)
+export const isSoldOut = (p: Product) => p.stock <= 0
