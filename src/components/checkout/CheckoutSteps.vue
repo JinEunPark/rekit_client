@@ -4,7 +4,7 @@ import IconBase from '@/components/ds/IconBase.vue'
 defineProps<{ current: 1 | 2 | 3 }>()
 
 const steps: { n: 1 | 2 | 3; label: string }[] = [
-  { n: 1, label: '본인인증' },
+  { n: 1, label: '휴대폰 인증' },
   { n: 2, label: '주문서 작성' },
   { n: 3, label: '결제' },
 ]

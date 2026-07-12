@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import AppModal from '@/components/ds/AppModal.vue'
+import PhoneVerifyForm from '@/components/auth/PhoneVerifyForm.vue'
 import { useAuthStore } from '@/stores/auth'
 import { withdrawMe } from '@/api/users'
 
@@ -44,50 +45,18 @@ async function save() {
 }
 
 // ── 휴대폰 변경 ────────────────────────────────────────────
-const phoneEdit = reactive({
-  open: false,
-  newPhone: '',
-  codeSent: false,
-  code: '',
-  sending: false,
-  verifying: false,
-  error: '',
-})
+// PhoneVerifyForm(Octomo QR 인증)이 phone 입력·발급·검증을 전부 관리한다 —
+// verifyPhone 이 백엔드에서 user.phone 까지 같이 갱신하므로, 여기서는
+// 패널을 열고 닫는 것과 완료 후 최신 상태를 반영하는 것만 담당한다.
+const phoneEditOpen = ref(false)
 
-const newPhoneValid = computed(() => /^01[016789]\d{7,8}$/.test(phoneEdit.newPhone.trim()))
-
-function openPhoneEdit() {
-  phoneEdit.open = !phoneEdit.open
-  phoneEdit.newPhone = auth.user?.phone ?? ''
-  phoneEdit.codeSent = false
-  phoneEdit.code = ''
-  phoneEdit.error = ''
+function togglePhoneEdit() {
+  phoneEditOpen.value = !phoneEditOpen.value
 }
 
-function sendPhoneCode() {
-  if (!newPhoneValid.value) {
-    phoneEdit.error = '올바른 휴대폰 번호를 입력해 주세요. (01012345678 형식)'
-    return
-  }
-  phoneEdit.error = ''
-  phoneEdit.codeSent = true
-}
-
-async function confirmPhoneCode() {
-  if (phoneEdit.code.length !== 6) {
-    phoneEdit.error = '6자리 인증번호를 입력해 주세요.'
-    return
-  }
-  phoneEdit.verifying = true
-  phoneEdit.error = ''
-  try {
-    await auth.updateProfile({ phone: phoneEdit.newPhone.trim() })
-    phoneEdit.open = false
-  } catch {
-    phoneEdit.error = '휴대폰 번호 변경에 실패했어요. 잠시 후 다시 시도해 주세요.'
-  } finally {
-    phoneEdit.verifying = false
-  }
+async function handlePhoneVerified() {
+  await auth.fetchMe() // user.phone/verified/phone_verified_at 최신화
+  phoneEditOpen.value = false
 }
 
 // ── 로그아웃 / 탈퇴 ────────────────────────────────────────
@@ -203,66 +172,31 @@ async function confirmWithdraw() {
             <span v-if="auth.user.phone">{{ auth.user.phone }}</span>
             <span v-else class="info__empty">미등록</span>
           </dd>
-          <button type="button" class="link link--sm" @click="openPhoneEdit">
-            {{ phoneEdit.open ? '취소' : auth.user.phone ? '변경' : '등록' }}
+          <button type="button" class="link link--sm" @click="togglePhoneEdit">
+            {{ phoneEditOpen ? '취소' : auth.user.phone ? '변경' : '등록' }}
           </button>
         </div>
-        <div v-if="phoneEdit.open" class="info__expand">
-          <div class="verify-row">
-            <input
-              v-model="phoneEdit.newPhone"
-              type="tel"
-              placeholder="01012345678"
-              inputmode="numeric"
-              class="verify-input"
-            />
-            <button
-              type="button"
-              class="verify-btn"
-              :disabled="phoneEdit.sending"
-              @click="sendPhoneCode"
-            >
-              {{ phoneEdit.codeSent ? '재전송' : '인증번호 전송' }}
-            </button>
-          </div>
-          <div v-if="phoneEdit.codeSent" class="verify-row">
-            <input
-              v-model="phoneEdit.code"
-              type="text"
-              placeholder="인증번호 6자리"
-              maxlength="6"
-              inputmode="numeric"
-              class="verify-input"
-            />
-            <button
-              type="button"
-              class="verify-btn"
-              :disabled="phoneEdit.verifying"
-              @click="confirmPhoneCode"
-            >
-              {{ phoneEdit.verifying ? '확인 중…' : '확인' }}
-            </button>
-          </div>
-          <p v-if="phoneEdit.error" class="field__errmsg">{{ phoneEdit.error }}</p>
+        <div v-if="phoneEditOpen" class="info__expand">
+          <PhoneVerifyForm :initial-phone="auth.user.phone ?? ''" @verified="handlePhoneVerified" />
         </div>
       </dl>
     </section>
 
     <!-- Verification status -->
     <section class="block">
-      <h2 class="block__title">본인인증 상태</h2>
+      <h2 class="block__title">휴대폰 인증 상태</h2>
       <div v-if="auth.user.verified" class="verify verify--on">
         <IconBase name="shield" :size="20" />
         <div>
           <div class="verify__t">인증완료</div>
-          <div class="verify__b">주문 시 본인인증 단계가 자동으로 생략돼요.</div>
+          <div class="verify__b">주문 시 휴대폰 인증 단계가 자동으로 생략돼요.</div>
         </div>
       </div>
       <div v-else class="verify">
         <IconBase name="warning" :size="20" />
         <div>
           <div class="verify__t">아직 인증되지 않았어요</div>
-          <div class="verify__b">첫 주문 시 본인인증 단계가 자동으로 진행돼요.</div>
+          <div class="verify__b">첫 주문 시 휴대폰 인증 단계가 자동으로 진행돼요.</div>
         </div>
       </div>
     </section>

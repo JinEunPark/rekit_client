@@ -8,6 +8,7 @@ import IconBase from '@/components/ds/IconBase.vue'
 import { useAddressStore, type Address } from '@/stores/addresses'
 import { useAuthStore } from '@/stores/auth'
 import { useKakaoPostcode } from '@/composables/useKakaoPostcode'
+import { formatPhoneNumber } from '@/utils/phone'
 
 const addresses = useAddressStore()
 const auth = useAuthStore()
@@ -45,6 +46,10 @@ const saving = ref(false)
 const saveError = ref('')
 
 const phoneValid = computed(() => /^\d{2,3}-?\d{3,4}-?\d{4}$/.test(form.phone.trim()))
+
+function onPhoneInput(e: Event) {
+  form.phone = formatPhoneNumber((e.target as HTMLInputElement).value)
+}
 const isValid = computed(
   () =>
     form.recipient.trim() &&
@@ -201,7 +206,14 @@ async function openZipSearch() {
           </label>
           <label class="field" :class="{ 'field--err': submitted && !phoneValid }">
             <span class="field__label">휴대폰</span>
-            <input v-model="form.phone" type="tel" placeholder="010-1234-5678" />
+            <input
+              :value="form.phone"
+              type="tel"
+              inputmode="numeric"
+              placeholder="010-1234-5678"
+              maxlength="13"
+              @input="onPhoneInput"
+            />
           </label>
         </div>
         <div v-if="searchingZip" class="zip-embed">
