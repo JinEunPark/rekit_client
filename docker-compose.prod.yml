@@ -1,0 +1,13 @@
+services:
+  web:
+    # Deploy 파이프라인에서 IMAGE_TAG 환경변수로 특정 커밋 태그 지정 가능 (롤백용). 미지정 시 latest.
+    image: 127.0.0.1:5000/rekit-client:${IMAGE_TAG:-latest}
+    container_name: rekle-web
+    restart: unless-stopped
+    # 호스트 포트 미노출 — rekit/nginx가 rekit_edge 네트워크로 컨테이너명(rekle-web) 접근
+    networks:
+      - rekit_edge
+
+networks:
+  rekit_edge:
+    external: true

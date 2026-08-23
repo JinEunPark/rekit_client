@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: 'latest',
+            description: '배포할 이미지 태그 (레지스트리에 push된 커밋 short sha, 또는 latest). 롤백 시 이전 sha 입력.'
+        )
+    }
+
+    environment {
+        COMPOSE_PROJECT = 'rekit-client'
+    }
+
+    stages {
+        stage('Deploy') {
+            steps {
+                echo "Deploying 127.0.0.1:5000/rekit-client:${params.IMAGE_TAG}"
+                sh """
+                    IMAGE_TAG=${params.IMAGE_TAG} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml pull web
+                    IMAGE_TAG=${params.IMAGE_TAG} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml up -d web
+                    docker image prune -f
+                """
+            }
+        }
+    }
+}
