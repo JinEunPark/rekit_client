@@ -36,9 +36,6 @@ const stateDesc = ref('')
 const original = ref('')
 const price = ref('')
 const stock = ref('1')
-const shippingMethod = ref('전문 설치 배송')
-const shippingFee = ref('')
-const installArea = ref('수도권 전 지역')
 
 const visibility = ref<'public' | 'private'>('public')
 const saving = ref(false)
@@ -51,7 +48,7 @@ const checklist = computed(() => [
   { t: '상태 등급 선택', done: !!grade.value },
   { t: '판매가 입력', done: !!price.value.trim() },
   { t: '재고 수량 입력', done: parseNum(stock.value) > 0 },
-  { t: '이미지 최소 4장 등록', done: images.value.length >= 4 },
+  { t: '이미지 최소 2장 등록', done: images.value.length >= 2 },
 ])
 
 const isReady = computed(() => checklist.value.every((c) => c.done))
@@ -123,10 +120,7 @@ async function handleSave(asDraft = false) {
             </div>
             <div class="field">
               <label class="field__label">브랜드 <span class="req">*</span></label>
-              <button type="button" class="input input--filled select">
-                <span>{{ brand }}</span>
-                <IconBase name="chevronDown" :size="16" />
-              </button>
+              <input v-model="brand" class="input input--filled" type="text" />
             </div>
             <div class="field">
               <label class="field__label">모델명 <span class="req">*</span></label>
@@ -134,16 +128,16 @@ async function handleSave(asDraft = false) {
             </div>
             <div class="field">
               <label class="field__label">카테고리 <span class="req">*</span></label>
-              <select v-model="category" class="input input--filled">
-                <option v-for="c in CATEGORY_OPTS" :key="c.id" :value="c.id">{{ c.label }}</option>
-              </select>
+              <div class="input-suffix">
+                <select v-model="category" class="input input--filled select-native">
+                  <option v-for="c in CATEGORY_OPTS" :key="c.id" :value="c.id">{{ c.label }}</option>
+                </select>
+                <IconBase name="chevronDown" :size="16" class="input-suffix__s" />
+              </div>
             </div>
             <div class="field">
               <label class="field__label">제조연도</label>
-              <button type="button" class="input input--filled select">
-                <span>{{ year }}</span>
-                <IconBase name="chevronDown" :size="16" />
-              </button>
+              <input v-model="year" class="input input--filled" type="text" placeholder="예: 2022" />
             </div>
             <div class="field">
               <label class="field__label">용량 / 사이즈</label>
@@ -221,10 +215,11 @@ async function handleSave(asDraft = false) {
           <header class="card__head">
             <h3 class="card__title">상품 이미지</h3>
           </header>
-          <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 4장 이상 등록해 주세요</p>
+          <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 2장 이상 등록해 주세요</p>
           <ProductImageEditor
             v-model:images="images"
             :disabled="saving"
+            :min="2"
             @error="(msg) => (saveError = msg)"
           />
         </section>
@@ -251,6 +246,10 @@ async function handleSave(asDraft = false) {
               </div>
               <div class="field__hint">VAT 포함 · 배송비 별도</div>
             </div>
+            <div class="field">
+              <label class="field__label">재고 수량 <span class="req">*</span></label>
+              <input v-model="stock" class="input input--filled" type="text" />
+            </div>
           </div>
           <div class="discount">
             <div class="discount__l">
@@ -260,53 +259,14 @@ async function handleSave(asDraft = false) {
             <span class="discount__v">{{ discountPct }}% 할인</span>
           </div>
         </section>
-
-        <section class="card">
-          <header class="card__head">
-            <h3 class="card__title">배송 / A/S 정보</h3>
-          </header>
-          <div class="grid2">
-            <div class="field">
-              <label class="field__label">재고 수량 <span class="req">*</span></label>
-              <input v-model="stock" class="input input--filled" type="text" />
-            </div>
-            <div class="field">
-              <label class="field__label">배송 방식</label>
-              <button type="button" class="input input--filled select">
-                <span>{{ shippingMethod }}</span>
-                <IconBase name="chevronDown" :size="16" />
-              </button>
-            </div>
-            <div class="field">
-              <label class="field__label">배송비</label>
-              <div class="input-suffix">
-                <input v-model="shippingFee" class="input" type="text" />
-                <span class="input-suffix__s">원</span>
-              </div>
-            </div>
-            <div class="field">
-              <label class="field__label">설치 가능 지역</label>
-              <button type="button" class="input select">
-                <span>{{ installArea }}</span>
-                <IconBase name="chevronDown" :size="16" />
-              </button>
-            </div>
-          </div>
-          <div class="callout">
-            <IconBase name="warning" :size="16" />
-            <div>
-              <div class="callout__t">A/S 불가 안내가 자동 표시됩니다</div>
-              <div class="callout__b">폐업 매장에서 입고된 가전 특성상 제조사 A/S는 적용되지 않습니다. 단, 배송 후 7일 내 동작 불량 발견 시 무상 교환·환불됩니다.</div>
-            </div>
-          </div>
-        </section>
       </div>
 
       <aside class="aside">
         <div class="card preview">
           <div class="preview__kicker">미리보기</div>
           <div class="preview__img">
-            <IconBase name="box" :size="48" />
+            <img v-if="images[0]" :src="images[0].url" :alt="title || '상품 이미지'" class="preview__img-el" />
+            <IconBase v-else name="box" :size="48" />
           </div>
           <div class="preview__row">
             <Badge tone="accent" size="sm">{{ grade }} {{ grades.find((g) => g.g === grade)!.label }}</Badge>
@@ -465,14 +425,11 @@ async function handleSave(asDraft = false) {
 .input--filled {
   border: 1.5px solid var(--rekit-ink);
 }
-.select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
+.select-native {
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
 }
-.select svg { color: var(--rekit-ink-subtle); }
 .textarea {
   min-height: 80px;
   resize: vertical;
@@ -591,28 +548,6 @@ async function handleSave(asDraft = false) {
   letter-spacing: -0.02em;
 }
 
-.callout {
-  margin-top: 16px;
-  padding: 14px 16px;
-  background: #FFF8E8;
-  border-radius: 12px;
-  border: 1px solid #F0D898;
-  display: flex;
-  gap: 10px;
-}
-.callout svg { color: #B5762A; flex-shrink: 0; margin-top: 2px; }
-.callout__t {
-  font-size: 13px;
-  font-weight: 700;
-  color: #7A5018;
-  margin-bottom: 4px;
-}
-.callout__b {
-  font-size: 12px;
-  color: #8B5E1F;
-  line-height: 1.55;
-}
-
 .preview__kicker {
   font-size: 12px;
   font-weight: 700;
@@ -629,6 +564,12 @@ async function handleSave(asDraft = false) {
   justify-content: center;
   margin-bottom: 12px;
   color: var(--rekit-ink-placeholder);
+  overflow: hidden;
+}
+.preview__img-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .preview__row {
   display: flex;

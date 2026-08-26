@@ -34,24 +34,36 @@ Authorization: Bearer <accessToken>
 
 ### 1.3 응답 포맷
 
-성공:
+> **2026-07 실측 정정**: 아래는 v1(2026-05) 설계 당시의 목표 포맷이었으나, 실제 구현된 백엔드(FastAPI)는
+> **`{ data: ... }` 래핑을 쓰지 않는다** — 모든 성공 응답은 리소스(또는 배열)를 **그대로** 반환한다.
+> 이 문서 전체에서 성공 응답 예시에 `{ "data": ... }`가 남아있는 곳은 실제로는 안쪽 값만 그대로 온다고
+> 읽을 것 (예: `{ "data": { "available": true } }` → 실제는 `{ "available": true }`).
+> 목록 엔드포인트는 두 가지 형태가 섞여 있다:
+> - 페이지네이션 있는 목록: `{ "items": [...], "meta": { "page", "size", "total", "total_pages" } }`
+>   (camelCase `totalPages`가 아니라 **snake_case `total_pages`**)
+> - 페이지네이션 없는 목록: 배열을 그대로 반환 (`Product[]`, `Address[]` 등)
+>
+> 필드 네이밍도 도메인마다 다르다 — Auth/User는 **camelCase**(`accessToken`, `loginId`), Products/Cart/
+> Addresses/Orders/Payments/Admin은 **snake_case**(`product_id`, `total_amount`)를 쓴다. 각 섹션의 예시가
+> 실제 값이니 그대로 따를 것 (일괄 변환하지 말 것).
+
+성공 (실제):
+```json
+{ "id": 1, "title": "..." }
+```
+또는 페이지네이션 목록:
 ```json
 {
-  "data": { ... } | [ ... ],
-  "meta": { "page": 1, "size": 20, "total": 124 }   // 페이지네이션 시
+  "items": [ { ... }, ... ],
+  "meta": { "page": 1, "size": 20, "total": 124, "total_pages": 7 }
 }
 ```
 
-실패:
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "휴대폰 번호 형식이 올바르지 않습니다",
-    "fields": { "phone": "INVALID_FORMAT" }   // 선택적
-  }
-}
-```
+실패: 라우터마다 포맷이 다르다 (§13 인트로 참고). 클라이언트(`src/api/client.ts`)는 방어적으로
+`payload.error`가 있으면 그 안쪽을, 없으면 `payload` 자체를 에러 바디로 취급한다.
+- 도메인 에러(대부분): `{ "code": "VALIDATION_ERROR", "message": "...", "fields": { "phone": "INVALID_FORMAT" } }`
+  (`{ "error": {...} }`로 한 번 더 감싸져 오는 라우터도 있음 — 위 방어 로직 참고)
+- FastAPI 자동 검증 422: `{ "detail": [ { "loc": [...], "msg": "...", "type": "..." } ] }`
 
 ### 1.4 HTTP 상태 코드
 
@@ -86,11 +98,14 @@ Authorization: Bearer <accessToken>
 | `RATE_LIMITED` | 429 | API 호출 한도 초과 |
 | `PRODUCT_NOT_FOUND` | 404 | (Admin) 상품 없음 |
 | `PRODUCT_IMAGE_NOT_FOUND` | 404 | (Admin) 이미지가 없거나 해당 상품 소유가 아님 |
+| `ORDER_NOT_FOUND` | 404 | 주문이 없거나 본인 주문이 아님 |
+| `CONTACT_NOT_FOUND` | 404 | 문의가 없거나 본인 문의가 아님 (§11.6) |
+| `PERMISSION_DENIED` | 403 | Admin 권한 필요 |
 
 ### 1.6 페이지네이션
 
 쿼리: `?page=1&size=20` (기본 20, 최대 100)
-응답 `meta`: `page`, `size`, `total`, `totalPages`
+응답 `meta`: `page`, `size`, `total`, `total_pages` (camelCase 아님 — §1.3 참고)
 
 대안: 커서 기반 (`?cursor=xxx&limit=20`) — 무한 스크롤 페이지에서 사용 권장
 
@@ -110,21 +125,28 @@ Authorization: Bearer <accessToken>
 
 ## 2. 도메인별 엔드포인트 요약
 
+> **2026-07 실측 기준으로 전면 갱신** — 아래 표·이후 섹션은 실제 백엔드(`GET /openapi.json`, 79개
+> 엔드포인트)와 현재 구현된 `src/api/*.ts`를 대조해 다시 작성했다. Admin(주문/회원/대시보드/매출/카테고리),
+> Help/Uploads/Admin상품은 이전에도 실측 반영되어 있었음.
+
 | 도메인 | 엔드포인트 수 | 비고 |
 |---|---|---|
-| Auth | 11 | 회원가입·로그인·찾기·본인인증 |
-| User | 4 | 내 정보 |
-| Products | 5 | 목록·상세·관련·카테고리·인기 검색어 |
-| Wishlist | 3 | 관심상품 |
-| Cart | 6 | 장바구니 (인증 사용자 동기화) |
-| Addresses | 5 | 배송지 CRUD |
-| Orders | 6 | 주문·취소·환불·배송조회 |
-| Payments | 5 | PG 연동 (대부분 서버↔PG) |
-| Help | 4 | 공지·FAQ·문의 |
+| Auth | 9 | 아이디중복확인·이메일인증·회원가입/소셜가입·로그인·로그아웃·재발급·아이디/비번찾기 |
+| User | 6 | 내 정보 CRUD·비밀번호 변경·휴대폰 인증(Octomo QR, §4.5/4.6) |
+| Products | 4 | 목록·상세·bulk 조회·featured |
+| Categories | 1 | 카테고리 목록 |
+| Favorites | 3 | 관심상품 (구 Wishlist) |
+| Cart | 5 | 장바구니 |
+| Addresses | 4 | 배송지 CRUD |
+| Orders | 7 | 견적·생성·목록·상세·취소·환불신청·배송조회 |
+| Payments | 3 | 결제 초기화·confirm(Toss)·웹훅 |
+| Help | 6 | 공지·FAQ·문의(제출/내목록/내상세) |
 | Misc | 1 | 우편번호 검색 (외부 SDK 권장) |
-| Admin — 상품 | 7 | 상품 CRUD + 이미지 관리 (실제 구현됨, §13) |
-| Uploads | 2 | Presigned URL 이미지 업로드 (실제 구현됨, §14) |
-| **합계** | **59** | |
+| Admin — 주문/회원/대시보드/매출/카테고리 | 20 | §13 이전부터 실연동 |
+| Admin — 상품 (이미지 포함) | 7 | 상품 CRUD + 이미지 관리 (§13) |
+| Admin — Help | 4 | 공지·FAQ·문의 관리 (§11.7) |
+| Uploads | 2 | Presigned URL 이미지 업로드 (§14) |
+| **합계** | **79** | 실제 `/openapi.json` paths 수 |
 
 ---
 

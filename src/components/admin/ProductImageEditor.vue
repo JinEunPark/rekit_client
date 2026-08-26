@@ -19,7 +19,7 @@ const props = withDefaults(
     max?: number
     min?: number
   }>(),
-  { productId: null, disabled: false, max: 10, min: 4 },
+  { productId: null, disabled: false, max: 10, min: 2 },
 )
 
 const emit = defineEmits<{

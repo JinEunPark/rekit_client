@@ -226,11 +226,12 @@ async function handleSave() {
 
         <section class="card">
           <header class="card__head"><h3 class="card__title">상품 이미지</h3></header>
-          <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 4장 이상 등록해 주세요</p>
+          <p class="card__sub">정면·측면·흠집 부위를 모두 포함하여 최소 2장 이상 등록해 주세요</p>
           <ProductImageEditor
             v-model:images="images"
             :product-id="productId"
             :disabled="saving"
+            :min="2"
             @error="(msg) => (saveError = msg)"
           />
         </section>
