@@ -89,7 +89,7 @@
 > 본인인증(OTP 연동)은 완료됨 — Octomo QR 방식으로 실연동, 위 요약표 참고.
 
 #### 네이버 로그인 검수 잔여 항목
-- [ ] 백엔드 `DELETE /users/me`(`WithdrawRequest`)가 `password`를 필수로 요구함 — 네이버 등 소셜 로그인 전용으로 가입해 비밀번호를 설정한 적 없는 사용자가 탈퇴(연동 해제) 가능한지 백엔드 확인 필요. 네이버 검수 시 회원탈퇴 기능이 실제로 동작해야 함
+- ✅ 소셜 전용 계정(`hasPassword=false`) 탈퇴 이슈 해소 — 백엔드가 `POST /auth/social/{provider}/reauth-for-withdrawal` 신규 추가(소셜 재인증으로 `withdrawalToken` 발급), `DELETE /users/me`가 `password`/`withdrawalToken` 분기 지원하도록 변경됨. 프론트 연동 완료: `src/config/oauth.ts`(purpose 플래그) · `src/views/auth/CallbackView.vue`(재인증 분기 처리) · `src/views/my/ProfileView.vue`(비밀번호 없는 계정은 소셜 재인증 버튼 노출) · `docs/api.md` §3.12/§4.1/§4.4 반영
 - [ ] 네이버 개발자센터에서 서비스 URL/Callback URL을 실제 배포 도메인(https)으로 등록 후 검수 신청
 
 #### 관리자 입금확인 처리 (신규 — 결제 방식 전환에 따른 후속 작업)

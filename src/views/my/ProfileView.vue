@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
@@ -8,6 +8,7 @@ import AppModal from '@/components/ds/AppModal.vue'
 import PhoneVerifyForm from '@/components/auth/PhoneVerifyForm.vue'
 import { useAuthStore } from '@/stores/auth'
 import { withdrawMe } from '@/api/users'
+import { buildAuthorizeUrl, type OAuthProvider } from '@/config/oauth'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -60,6 +61,8 @@ async function handlePhoneVerified() {
 }
 
 // ── 로그아웃 / 탈퇴 ────────────────────────────────────────
+// hasPassword=false면 소셜 전용 가입 — 비밀번호 대신 소셜 재인증(reauth-for-withdrawal)으로 탈퇴.
+const hasPassword = computed(() => auth.user?.hasPassword ?? true)
 const withdrawing = ref(false)
 const withdrawOpen = ref(false)
 const withdrawPassword = ref('')
@@ -84,7 +87,7 @@ async function confirmWithdraw() {
   withdrawing.value = true
   withdrawError.value = ''
   try {
-    await withdrawMe(withdrawPassword.value)
+    await withdrawMe({ password: withdrawPassword.value })
     withdrawOpen.value = false
     auth.logout()
     router.replace('/')
@@ -97,6 +100,11 @@ async function confirmWithdraw() {
   } finally {
     withdrawing.value = false
   }
+}
+
+/** 소셜 전용 계정: 가입 시 쓴 소셜 계정으로 다시 동의창을 태워 본인 확인 후 탈퇴를 이어간다. */
+function startSocialReauthWithdraw(provider: OAuthProvider) {
+  window.location.href = buildAuthorizeUrl(provider, 'withdrawal')
 }
 </script>
 
@@ -245,7 +253,7 @@ async function confirmWithdraw() {
         탈퇴하면 관심상품·쿠폰 등 혜택이 모두 삭제돼요.<br>
         주문 내역은 전자상거래법에 따라 5년간 보존됩니다.
       </p>
-      <form novalidate @submit.prevent="confirmWithdraw">
+      <form v-if="hasPassword" novalidate @submit.prevent="confirmWithdraw">
         <label class="field" :class="{ 'field--err': !!withdrawError }">
           <span class="field__label">현재 비밀번호</span>
           <input
@@ -263,6 +271,19 @@ async function confirmWithdraw() {
           </Button>
         </div>
       </form>
+
+      <!-- 소셜 전용 가입 — 비밀번호가 없으니 가입 시 쓴 소셜 계정으로 재인증해야 탈퇴 가능 -->
+      <div v-else class="withdraw-social">
+        <p class="withdraw-social__hint">
+          소셜 계정으로 가입해 별도 비밀번호가 없어요. 가입할 때 사용한 소셜 계정으로 다시 인증하면 탈퇴가 진행돼요.
+        </p>
+        <div class="withdraw-social__btns">
+          <button type="button" class="social social--kakao" @click="startSocialReauthWithdraw('kakao')">카카오로 인증</button>
+          <button type="button" class="social social--naver" @click="startSocialReauthWithdraw('naver')">네이버로 인증</button>
+          <button type="button" class="social social--google" @click="startSocialReauthWithdraw('google')">Google로 인증</button>
+        </div>
+        <Button variant="secondary" size="lg" full @click="withdrawOpen = false">취소</Button>
+      </div>
     </AppModal>
   </div>
 </template>
@@ -546,6 +567,46 @@ async function confirmWithdraw() {
 .modal__cta {
   display: flex;
   gap: 8px;
+}
+
+.withdraw-social {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.withdraw-social__hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--rekit-ink-muted);
+  line-height: 1.6;
+}
+.withdraw-social__btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.social--kakao {
+  background: #fee500;
+  color: #3b1e1e;
+}
+.social--naver {
+  background: #03c75a;
+  color: #fff;
+}
+.social--google {
+  background: var(--rekit-surface);
+  color: var(--rekit-ink);
+  border: 1px solid var(--rekit-border);
 }
 
 /* guest */

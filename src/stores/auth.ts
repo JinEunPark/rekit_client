@@ -15,6 +15,8 @@ export interface User {
   verified: boolean
   ecoKg: number
   role: 'USER' | 'ADMIN'
+  /** false면 소셜 전용 계정(비밀번호 없음) — 탈퇴 시 소셜 재인증(withdrawalToken) 필요. fetchMe 전엔 true로 낙관 처리. */
+  hasPassword: boolean
 }
 
 const STORAGE_KEY = 'rekit.auth.user.v3'
@@ -25,7 +27,7 @@ function loadUser(): User | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<User>
-    return { ...parsed, role: parsed.role ?? 'USER' } as User
+    return { ...parsed, role: parsed.role ?? 'USER', hasPassword: parsed.hasPassword ?? true } as User
   } catch {
     return null
   }
@@ -53,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
       verified: input.verified ?? false,
       ecoKg: input.ecoKg ?? 86,
       role: input.role ?? 'USER',
+      hasPassword: input.hasPassword ?? true,
     }
     persist()
   }
@@ -74,6 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
         verified: me.verified,
         ecoKg: me.ecoKg,
         role: me.role ?? 'USER',
+        hasPassword: me.hasPassword ?? true,
       }
       persist()
     } catch {
@@ -105,6 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
       verified: res.verified,
       ecoKg: res.ecoKg,
       role: res.role ?? 'USER',
+      hasPassword: res.hasPassword ?? true,
     }
     persist()
   }

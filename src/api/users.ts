@@ -27,8 +27,15 @@ export function changePassword(payload: ChangePasswordPayload): Promise<void> {
   })
 }
 
-export function withdrawMe(password: string): Promise<void> {
-  return apiRequest<void>('/users/me', { method: 'DELETE', body: { password }, auth: true })
+export interface WithdrawPayload {
+  /** hasPassword=true 계정만 필수 */
+  password?: string
+  /** hasPassword=false(소셜 전용) 계정만 필수 — POST /auth/social/{provider}/reauth-for-withdrawal 로 발급 */
+  withdrawalToken?: string
+}
+
+export function withdrawMe(payload: WithdrawPayload): Promise<void> {
+  return apiRequest<void>('/users/me', { method: 'DELETE', body: payload, auth: true })
 }
 
 export interface PhoneSendVerificationResponse {

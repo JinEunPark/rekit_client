@@ -85,7 +85,7 @@ Authorization: Bearer <accessToken>
 
 | Code | HTTP | 의미 |
 |---|---|---|
-| `INVALID_CREDENTIALS` | 401 | 아이디/비밀번호 불일치 |
+| `INVALID_CREDENTIALS` | 401 | 아이디/비밀번호 불일치, 또는 탈퇴 소셜 재인증(3.12) 시 다른/미연결 계정 |
 | `TOKEN_EXPIRED` | 401 | 액세스 토큰 만료 |
 | `USERNAME_TAKEN` | 409 | 아이디 중복 |
 | `EMAIL_TAKEN` | 409 | 이메일 중복 |
@@ -125,13 +125,14 @@ Authorization: Bearer <accessToken>
 
 ## 2. 도메인별 엔드포인트 요약
 
-> **2026-07 실측 기준으로 전면 갱신** — 아래 표·이후 섹션은 실제 백엔드(`GET /openapi.json`, 79개
+> **2026-07 실측 기준으로 전면 갱신** — 아래 표·이후 섹션은 실제 백엔드(`GET /openapi.json`, 당시 79개
 > 엔드포인트)와 현재 구현된 `src/api/*.ts`를 대조해 다시 작성했다. Admin(주문/회원/대시보드/매출/카테고리),
-> Help/Uploads/Admin상품은 이전에도 실측 반영되어 있었음.
+> Help/Uploads/Admin상품은 이전에도 실측 반영되어 있었음. **2026-08**: 소셜 탈퇴 재인증 엔드포인트(3.12)
+> 신규 추가로 80개.
 
 | 도메인 | 엔드포인트 수 | 비고 |
 |---|---|---|
-| Auth | 9 | 아이디중복확인·이메일인증·회원가입/소셜가입·로그인·로그아웃·재발급·아이디/비번찾기 |
+| Auth | 10 | 아이디중복확인·이메일인증·회원가입/소셜가입·로그인·로그아웃·재발급·아이디/비번찾기·소셜 탈퇴 재인증(§3.12, 2026-08) |
 | User | 6 | 내 정보 CRUD·비밀번호 변경·휴대폰 인증(Octomo QR, §4.5/4.6) |
 | Products | 4 | 목록·상세·bulk 조회·featured |
 | Categories | 1 | 카테고리 목록 |
@@ -146,7 +147,7 @@ Authorization: Bearer <accessToken>
 | Admin — 상품 (이미지 포함) | 7 | 상품 CRUD + 이미지 관리 (§13) |
 | Admin — Help | 4 | 공지·FAQ·문의 관리 (§11.7) |
 | Uploads | 2 | Presigned URL 이미지 업로드 (§14) |
-| **합계** | **79** | 실제 `/openapi.json` paths 수 |
+| **합계** | **80** | 실제 `/openapi.json` paths 수 |
 
 ---
 
@@ -253,17 +254,17 @@ POST /auth/refresh
 { "data": { "accessToken": "eyJ..." } }
 ```
 
-### 3.6 소셜 로그인 콜백 (예약)
+### 3.6 소셜 로그인 콜백
 
 ```
 POST /auth/social/{provider}/callback
 ```
 
-`provider`: `kakao` | `naver`
+**실제 구현됨** (2026-08 실측). `provider`: `kakao` | `naver` | `google`
 
-**Body**
+**Body** (`SocialCallbackRequest`)
 ```json
-{ "code": "...", "state": "..." }
+{ "code": "OAuth authorization code (필수)", "state": "네이버는 필수, 카카오/구글은 optional" }
 ```
 
 **Response 200**: 로그인과 동일 + 가입이 필요하면 `needsSignUp: true` 와 `tempToken` 반환
@@ -380,6 +381,39 @@ POST /auth/identity/verify-confirm
 **Errors**: `OTP_INVALID` (422)
 
 > 실제 운영에서는 토스페이먼츠/NICE/KCP의 본인인증 SDK가 통신사 인증을 처리하고, rekit 서버는 PG가 발급한 인증 결과(CI/DI)만 받아 저장합니다. 자체 OTP 발송은 **개발 mock 단계**에서만 사용하고, production은 PG 연동 권장.
+>
+> ⚠️ **2026-08 실측 정정**: 위 3.10/3.11의 본인인증 OTP는 실제로는 이 스펙대로 구현되지 않았다.
+> 실제 휴대폰 본인인증은 **Octomo QR 방식**으로 별도 구현됨 — `POST /users/me/phone/send-verification`
+> (QR 발급) / `POST /users/me/phone/verify` (수신 확인), §4.5/4.6 참고. `/auth/identity/verify-*`
+> 엔드포인트는 존재하지 않는다.
+
+### 3.12 소셜 재인증 — 탈퇴용 (2026-08 신규, 실측 반영)
+
+```
+POST /auth/social/{provider}/reauth-for-withdrawal
+```
+
+**Auth required**. `provider`: `kakao` | `naver` | `google` — 3.6과 동일한 어댑터 재사용, 제한 없음.
+
+소셜 전용 가입 계정(비밀번호 없음, `GET /users/me`의 `hasPassword=false`)이 회원탈퇴 직전
+본인 확인용으로 호출. 프론트가 탈퇴 확인 화면에서 소셜 로그인 동의창을 다시 띄워 받은 `code`를
+그대로 전달하면, PG 재교환 결과가 **로그인된 본인**의 연결된 소셜 계정과 일치할 때만
+`withdrawalToken` 발급. `hasPassword=true` 계정은 이 절차가 필요 없음 (기존 비밀번호로 4.4 진행).
+
+**Body** (`SocialCallbackRequest` — 3.6과 동일 스키마)
+```json
+{ "code": "...", "state": "..." }
+```
+
+**Response 200** (`WithdrawalReauthResponse`)
+```json
+{ "withdrawalToken": "eyJ..." }
+```
+단명(10분) JWT. `DELETE /users/me`의 `withdrawalToken` 필드에 그대로 실어 보낸다 (4.4 참고).
+
+**Errors**
+- `INVALID_CREDENTIALS` (401): 재인증한 소셜 계정이 로그인된 본인 것과 다르거나 미연결
+- `SocialEmailRequiredError` (422) / `SocialOAuthFailedError` (502): PG 통신 실패
 
 ---
 
@@ -393,22 +427,22 @@ GET /users/me
 
 **Auth required**
 
-**Response 200**
+**Response 200** — 실제로는 `{data}` 래핑 없이 바로 반환 (§1.3), 필드도 camelCase(`UserResponse`)
 ```json
 {
-  "data": {
-    "id": "u_abc123",
-    "username": "eunyoung_kim",
-    "name": "박은영",
-    "email": "eunyoung@example.com",
-    "phone": "010-1234-5678",
-    "verified": true,
-    "ecoKg": 86,
-    "createdAt": "2026-04-10T08:30:00Z",
-    "marketingOptIn": false
-  }
+  "id": 1,
+  "loginId": "eunyoung_kim",
+  "username": "박은영",
+  "email": "eunyoung@example.com",
+  "phone": "010-1234-5678",
+  "verified": true,
+  "role": "USER",
+  "hasPassword": true,
+  "ecoKg": 86
 }
 ```
+`hasPassword` (2026-08 신규): `false`면 소셜 전용 가입(비밀번호 미설정) 계정 — 회원탈퇴 시
+password 대신 3.12로 발급받은 `withdrawalToken`이 필요함 (4.4 참고).
 
 ### 4.2 프로필 수정
 
@@ -452,10 +486,15 @@ DELETE /users/me
 
 **Auth required**
 
-**Body** (재인증)
+**Body** (`WithdrawRequest`, 2026-08 실측 정정 — 본인 확인 방식이 `hasPassword`로 분기됨)
 ```json
-{ "password": "abc12345", "reason": "기타" }
+{
+  "password": "abc12345",     // hasPassword=true 계정만 필수
+  "withdrawalToken": null      // hasPassword=false(소셜 전용) 계정만 필수 — 3.12로 발급받음
+}
 ```
+- `hasPassword=true` (일반 ID/PW 가입, 또는 소셜 연동 후 비밀번호를 설정한 적 있는 계정): `password`만 보내면 됨. 3.12 호출 불필요.
+- `hasPassword=false` (소셜 전용 가입): 탈퇴 확인 화면에서 소셜 로그인 동의창을 다시 태워 `code`를 받고 → 3.12로 `withdrawalToken` 발급받은 뒤 → 여기에 `withdrawalToken`만 실어 보냄 (`password`는 생략).
 
 탈퇴 후 처리 정책:
 - 본인 식별 정보 즉시 익명화

@@ -31,6 +31,10 @@ export const OAUTH_PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
 }
 
 const STATE_KEY_PREFIX = 'rekit.oauth.state.'
+/** 콜백 페이지가 재로그인이 아니라 탈퇴 재인증 흐름인지 구분하는 플래그. 리다이렉트 왕복 동안 sessionStorage로 보존. */
+const PURPOSE_KEY = 'rekit.oauth.purpose'
+
+export type OAuthPurpose = 'withdrawal'
 
 function generateState(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -39,7 +43,7 @@ function generateState(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-export function buildAuthorizeUrl(provider: OAuthProvider): string {
+export function buildAuthorizeUrl(provider: OAuthProvider, purpose?: OAuthPurpose): string {
   const cfg = OAUTH_PROVIDERS[provider]
   if (!cfg.clientId) {
     throw new Error(`[oauth] ${provider} client id가 .env.local에 설정되지 않았습니다.`)
@@ -47,6 +51,8 @@ export function buildAuthorizeUrl(provider: OAuthProvider): string {
 
   const state = generateState()
   sessionStorage.setItem(STATE_KEY_PREFIX + provider, state)
+  if (purpose) sessionStorage.setItem(PURPOSE_KEY, purpose)
+  else sessionStorage.removeItem(PURPOSE_KEY)
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -57,6 +63,13 @@ export function buildAuthorizeUrl(provider: OAuthProvider): string {
   if (cfg.scope) params.set('scope', cfg.scope)
 
   return `${cfg.authUrl}?${params.toString()}`
+}
+
+/** 콜백 페이지 진입 시 1회 소비 — 탈퇴 재인증 흐름이었는지 확인. */
+export function consumeStoredPurpose(): OAuthPurpose | null {
+  const value = sessionStorage.getItem(PURPOSE_KEY)
+  sessionStorage.removeItem(PURPOSE_KEY)
+  return value === 'withdrawal' ? 'withdrawal' : null
 }
 
 export function consumeStoredState(provider: OAuthProvider): string | null {

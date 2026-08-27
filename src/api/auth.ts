@@ -17,6 +17,8 @@ export interface UserResponse {
   ecoKg: number
   /** 백엔드 UserRole enum: "USER" | "ADMIN". GET /users/me 에 미포함 시 undefined → 'USER' fallback. */
   role?: 'USER' | 'ADMIN'
+  /** false면 소셜 전용 계정(비밀번호 없음) — 탈퇴 시 password 대신 withdrawalToken 필요. */
+  hasPassword?: boolean
 }
 
 export interface SignInPayload {
@@ -129,5 +131,25 @@ export function socialSignUp(payload: SocialSignUpPayload): Promise<TokenRespons
   return apiRequest<TokenResponse>('/auth/social/sign-up', {
     method: 'POST',
     body: payload,
+  })
+}
+
+export interface WithdrawalReauthResponse {
+  /** 단명(10분) JWT. DELETE /users/me 의 withdrawalToken 필드에 그대로 실어 보낸다. */
+  withdrawalToken: string
+}
+
+/**
+ * 소셜 전용 계정(hasPassword=false)의 탈퇴 직전 본인 확인.
+ * 로그인된 본인의 소셜 계정과 재인증 결과가 일치할 때만 withdrawalToken 발급.
+ */
+export function socialReauthForWithdrawal(
+  provider: OAuthProvider,
+  body: { code: string; state: string | null },
+): Promise<WithdrawalReauthResponse> {
+  return apiRequest<WithdrawalReauthResponse>(`/auth/social/${provider}/reauth-for-withdrawal`, {
+    method: 'POST',
+    body,
+    auth: true,
   })
 }

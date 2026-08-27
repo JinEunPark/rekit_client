@@ -7,10 +7,12 @@ import { useAuthStore } from '@/stores/auth'
 import {
   OAUTH_PROVIDERS,
   consumeStoredState,
+  consumeStoredPurpose,
   isOAuthProvider,
   type OAuthProvider,
 } from '@/config/oauth'
-import { socialCallback } from '@/api/auth'
+import { socialCallback, socialReauthForWithdrawal } from '@/api/auth'
+import { withdrawMe } from '@/api/users'
 import { ApiError } from '@/api/client'
 
 type Status = 'processing' | 'success' | 'error'
@@ -21,6 +23,8 @@ const auth = useAuthStore()
 
 const status = ref<Status>('processing')
 const errorMessage = ref('')
+// 탈퇴 재인증 흐름이면 로그인 성공/실패 화면 대신 탈퇴 결과 화면을 보여준다.
+const isWithdrawalFlow = ref(false)
 const provider = computed<OAuthProvider | null>(() => {
   const raw = String(route.params.provider ?? '')
   return isOAuthProvider(raw) ? raw : null
@@ -32,6 +36,9 @@ onMounted(async () => {
     fail('알 수 없는 소셜 로그인 제공자입니다.')
     return
   }
+
+  const purpose = consumeStoredPurpose()
+  isWithdrawalFlow.value = purpose === 'withdrawal'
 
   const query = route.query
   if (typeof query.error === 'string') {
@@ -49,6 +56,30 @@ onMounted(async () => {
   }
   if (!expectedState || expectedState !== returnedState) {
     fail('보안 검증(state)에 실패했습니다. 다시 시도해 주세요.')
+    return
+  }
+
+  if (isWithdrawalFlow.value) {
+    try {
+      const { withdrawalToken } = await socialReauthForWithdrawal(provider.value, {
+        code,
+        state: returnedState,
+      })
+      await withdrawMe({ withdrawalToken })
+      auth.logout()
+      status.value = 'success'
+      window.setTimeout(() => router.replace('/'), 1200)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        fail(
+          err.code === 'INVALID_CREDENTIALS'
+            ? '가입 시 사용한 소셜 계정이 아니에요. 다른 계정으로 다시 시도해 주세요.'
+            : `${err.message} (${err.code})`,
+        )
+      } else {
+        fail(err instanceof Error ? err.message : '알 수 없는 오류')
+      }
+    }
     return
   }
 
@@ -107,22 +138,30 @@ function fail(message: string) {
 
       <template v-if="status === 'processing'">
         <div class="spinner" aria-hidden="true" />
-        <h1>{{ providerLabel }} 로그인 처리 중…</h1>
+        <h1>{{ providerLabel }} {{ isWithdrawalFlow ? '재인증 처리 중…' : '로그인 처리 중…' }}</h1>
         <p>잠시만 기다려 주세요.</p>
       </template>
 
       <template v-else-if="status === 'success'">
         <div class="badge badge--ok" aria-hidden="true">✓</div>
-        <h1>{{ providerLabel }} 로그인 완료</h1>
-        <p>홈으로 이동하고 있어요…</p>
+        <template v-if="isWithdrawalFlow">
+          <h1>회원 탈퇴가 완료됐어요</h1>
+          <p>이용해 주셔서 감사했습니다. 홈으로 이동하고 있어요…</p>
+        </template>
+        <template v-else>
+          <h1>{{ providerLabel }} 로그인 완료</h1>
+          <p>홈으로 이동하고 있어요…</p>
+        </template>
       </template>
 
       <template v-else>
         <div class="badge badge--err" aria-hidden="true">!</div>
-        <h1>로그인에 실패했어요</h1>
+        <h1>{{ isWithdrawalFlow ? '탈퇴 처리에 실패했어요' : '로그인에 실패했어요' }}</h1>
         <p>{{ errorMessage }}</p>
-        <RouterLink to="/auth/sign-in" v-slot="{ navigate }">
-          <Button variant="accent" size="lg" full @click="navigate">로그인 화면으로</Button>
+        <RouterLink :to="isWithdrawalFlow ? '/my/profile' : '/auth/sign-in'" v-slot="{ navigate }">
+          <Button variant="accent" size="lg" full @click="navigate">
+            {{ isWithdrawalFlow ? '마이페이지로' : '로그인 화면으로' }}
+          </Button>
         </RouterLink>
       </template>
     </main>
