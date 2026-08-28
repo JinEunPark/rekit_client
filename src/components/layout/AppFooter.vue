@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
+
+// 사업자등록증 상 정보와 완전히 일치해야 함 (전자상거래법 §10 표시 의무)
+const BUSINESS_INFO = [
+  { label: '상호명', value: '주식회사 리킷' },
+  { label: '대표자명', value: '홍길동' },
+  { label: '사업자등록번호', value: '000-00-00000' },
+  { label: '사업장 주소', value: '서울특별시 강남구 테헤란로 000, 0층' },
+  { label: '유선번호', value: '070-0000-0000' },
+] as const
 </script>
 
 <template>
@@ -32,6 +41,14 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
         </div>
       </div>
     </div>
+
+    <dl class="ft__biz">
+      <div v-for="row in BUSINESS_INFO" :key="row.label" class="ft__biz-row">
+        <dt>{{ row.label }}</dt>
+        <dd>{{ row.value }}</dd>
+      </div>
+    </dl>
+
     <div class="ft__bottom">© 2026 rekit. All rights reserved.</div>
   </footer>
 </template>
@@ -87,6 +104,33 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
   color: var(--rekit-ink);
 }
 
+.ft__biz {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+  border-top: 1px solid var(--rekit-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--rekit-ink-subtle);
+}
+
+.ft__biz-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ft__biz dt {
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+}
+
+.ft__biz dd {
+  margin: 0;
+}
+
 .ft__bottom {
   border-top: 1px solid var(--rekit-border);
   padding: 16px 20px;
@@ -100,6 +144,10 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
   .ft__inner {
     grid-template-columns: 1.2fr 2fr;
     padding: 56px 32px;
+  }
+
+  .ft__biz {
+    padding: 24px 32px;
   }
 }
 </style>

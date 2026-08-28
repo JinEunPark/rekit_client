@@ -110,8 +110,6 @@ export interface SocialCallbackResponse {
 
 export interface SocialSignUpPayload {
   tempToken: string
-  loginId: string
-  username: string
   agreedTerms: boolean
   agreedPrivacy: boolean
   agreedMarketing: boolean

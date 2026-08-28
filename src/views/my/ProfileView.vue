@@ -559,6 +559,44 @@ function startSocialReauthWithdraw(provider: OAuthProvider) {
   color: var(--rekit-ink-muted);
   line-height: 1.65;
 }
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.field__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rekit-ink-muted);
+}
+.field input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  background: var(--rekit-surface);
+  border: 1px solid var(--rekit-border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--rekit-ink);
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.field input:focus {
+  border-color: var(--rekit-ink);
+  box-shadow: 0 0 0 3px rgba(26, 26, 23, 0.06);
+}
+.field input::placeholder {
+  color: var(--rekit-ink-placeholder);
+}
+.field--err input {
+  border-color: var(--rekit-danger);
+}
 .field__errmsg {
   margin: -6px 0 0;
   font-size: 12px;

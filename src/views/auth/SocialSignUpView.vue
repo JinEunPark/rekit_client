@@ -24,30 +24,17 @@ const tempToken = computed(() => String(route.query.tempToken ?? ''))
 const email = computed(() => String(route.query.email ?? ''))
 const suggestedName = computed(() => String(route.query.suggestedName ?? ''))
 
-const loginId = ref('')
-const username = ref(suggestedName.value)
-const loginIdFocused = ref(false)
-const usernameFocused = ref(false)
-
 const agreeTerms = ref(false)
 const agreePrivacy = ref(false)
 const agreeMarketing = ref(false)
 const requiredAgreed = computed(() => agreeTerms.value && agreePrivacy.value)
 const allAgreed = computed(() => requiredAgreed.value && agreeMarketing.value)
 
-const loginIdValid = computed(() => /^[a-zA-Z0-9_]{4,20}$/.test(loginId.value.trim()))
-const usernameValid = computed(() => username.value.trim().length >= 1)
-
 const submitting = ref(false)
 const errorMessage = ref('')
 
 const canSubmit = computed(
-  () =>
-    !submitting.value &&
-    !!tempToken.value &&
-    loginIdValid.value &&
-    usernameValid.value &&
-    requiredAgreed.value,
+  () => !submitting.value && !!tempToken.value && requiredAgreed.value,
 )
 
 function toggleAll() {
@@ -65,15 +52,14 @@ async function submit(e: Event) {
   try {
     const result = await socialSignUp({
       tempToken: tempToken.value,
-      loginId: loginId.value.trim(),
-      username: username.value.trim(),
       agreedTerms: agreeTerms.value,
       agreedPrivacy: agreePrivacy.value,
       agreedMarketing: agreeMarketing.value,
     })
+    // login_id는 서버 자동 생성, username은 소셜 닉네임 그대로 저장됨 — 정확한 값은 곧이어 fetchMe()가 채운다.
     auth.setSession(result.accessToken, {
-      loginId: loginId.value.trim(),
-      username: username.value.trim(),
+      loginId: `${providerKey.value}_user`,
+      username: suggestedName.value || `${providerLabel.value} 사용자`,
       email: email.value || undefined,
     })
     void auth.fetchMe()
@@ -103,48 +89,11 @@ async function submit(e: Event) {
 
       <header class="auth__head">
         <h1>{{ providerLabel }} 계정으로 가입을 마무리해요</h1>
-        <p v-if="email">{{ email }} · 사용할 아이디만 정해주시면 됩니다</p>
-        <p v-else>사용할 아이디만 정해주시면 됩니다</p>
+        <p v-if="email">{{ email }} · 약관에 동의하면 바로 가입이 완료돼요</p>
+        <p v-else>약관에 동의하면 바로 가입이 완료돼요</p>
       </header>
 
       <form class="auth__form" @submit="submit">
-        <label class="field" :class="{ 'field--focus': loginIdFocused }">
-          <span class="field__label">아이디</span>
-          <div class="field__row">
-            <input
-              v-model="loginId"
-              type="text"
-              autocomplete="username"
-              autocapitalize="off"
-              autocorrect="off"
-              spellcheck="false"
-              placeholder="영문·숫자·_ 4~20자"
-              @focus="loginIdFocused = true"
-              @blur="loginIdFocused = false"
-            />
-          </div>
-          <span
-            v-if="loginId.length > 0 && !loginIdValid"
-            class="field__hint field__hint--muted"
-          >
-            영문·숫자·_ 조합으로 4~20자 입력해 주세요
-          </span>
-        </label>
-
-        <label class="field" :class="{ 'field--focus': usernameFocused }">
-          <span class="field__label">이름</span>
-          <div class="field__row">
-            <input
-              v-model="username"
-              type="text"
-              autocomplete="name"
-              placeholder="화면에 표시될 이름"
-              @focus="usernameFocused = true"
-              @blur="usernameFocused = false"
-            />
-          </div>
-        </label>
-
         <fieldset class="agree">
           <label class="agree__row agree__row--all">
             <input type="checkbox" :checked="allAgreed" @change="toggleAll" />
@@ -255,55 +204,6 @@ async function submit(e: Event) {
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field__label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rekit-ink-muted);
-}
-.field__row {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  padding: 0 16px;
-  background: var(--rekit-surface);
-  border: 1px solid var(--rekit-border);
-  border-radius: 12px;
-  height: 54px;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-.field--focus .field__row {
-  border-color: var(--rekit-ink);
-  box-shadow: 0 0 0 3px rgba(26, 26, 23, 0.06);
-}
-.field__row input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--rekit-ink);
-  min-width: 0;
-}
-.field__row input::placeholder {
-  color: var(--rekit-ink-placeholder);
-}
-.field__hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.field__hint--muted {
-  color: var(--rekit-ink-subtle);
 }
 .agree {
   margin-top: 4px;
