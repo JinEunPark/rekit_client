@@ -4,6 +4,9 @@ pipeline {
     environment {
         REGISTRY   = '127.0.0.1:5000'
         IMAGE_NAME = 'rekit-client'
+        // 저장소에 커밋하지 않는 빌드타임 주입값(OAuth client id 등) — 백엔드(rekit_backend.env)와 동일 규칙.
+        // jenkins 컨테이너에 /home/wlsdms/rekit/secrets 가 :ro 로 마운트돼 있음.
+        CLIENT_ENV_FILE = '/home/wlsdms/rekit/secrets/rekit_client.env'
     }
 
     stages {
@@ -12,21 +15,37 @@ pipeline {
                 script {
                     env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 }
-                sh """
+                sh '''
+                    set -eu
+                    # VITE_* 값을 시크릿 파일에서 로드 (파일 없으면 빈 값으로 빌드 → 소셜 로그인만 비활성)
+                    if [ -f "$CLIENT_ENV_FILE" ]; then
+                        set -a
+                        . "$CLIENT_ENV_FILE"
+                        set +a
+                    else
+                        echo "WARN: $CLIENT_ENV_FILE 없음 — OAuth 값 없이 빌드함"
+                    fi
+
                     docker build \
-                      -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
-                      -t ${REGISTRY}/${IMAGE_NAME}:latest \
+                      --build-arg VITE_KAKAO_CLIENT_ID="${VITE_KAKAO_CLIENT_ID:-}" \
+                      --build-arg VITE_KAKAO_REDIRECT_URI="${VITE_KAKAO_REDIRECT_URI:-}" \
+                      --build-arg VITE_NAVER_CLIENT_ID="${VITE_NAVER_CLIENT_ID:-}" \
+                      --build-arg VITE_NAVER_REDIRECT_URI="${VITE_NAVER_REDIRECT_URI:-}" \
+                      --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID:-}" \
+                      --build-arg VITE_GOOGLE_REDIRECT_URI="${VITE_GOOGLE_REDIRECT_URI:-}" \
+                      -t "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" \
+                      -t "$REGISTRY/$IMAGE_NAME:latest" \
                       .
-                    docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                """
+                    docker push "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+                    docker push "$REGISTRY/$IMAGE_NAME:latest"
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "이미지 push 완료: ${REGISTRY}/${IMAGE_NAME}:${env.IMAGE_TAG} (+ latest). 배포는 rekit-client-deploy 잡에서 IMAGE_TAG=${env.IMAGE_TAG} 로 수동 실행."
+            echo "이미지 push 완료: ${REGISTRY}/${IMAGE_NAME}:${env.IMAGE_TAG} (+ latest). 배포는 deploy-client 잡에서 IMAGE_TAG=${env.IMAGE_TAG} 로 수동 실행."
         }
     }
 }
