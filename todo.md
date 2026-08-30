@@ -114,7 +114,7 @@
   - ✅ 라우트별 `<title>`·`description`·`canonical`·OG/트위터 메타 — 홈/상품목록/상품상세/소개/가이드/FAQ/문의/공지/약관/개인정보
   - ✅ `index.html` `lang="ko"` + 기본 메타, `public/robots.txt`, `public/sitemap.xml`(`scripts/gen-sitemap.mjs`, build 시 자동 생성)
   - ✅ 비공개 경로(`/admin` `/my` `/cart` `/checkout` `/auth` `/search` `/_design`)·404 는 `noindex` (App.vue 전역 처리)
-  - [ ] `public/og-cover.png` 제작 (1200×630) — 현재 메타는 경로만 참조, 파일 없음
+  - ✅ `public/og-cover.png` (1200×630) — `scripts/gen-og.mjs`(@resvg/resvg-js)로 생성, `npm run gen-og`로 재생성
   - [ ] 배포 후: Google Search Console 도메인 등록 → sitemap 제출 → 주요 URL 색인 요청
   - [ ] 가비아 호스팅 `.htaccess` SPA fallback + `www`→루트 301
   - [ ] 2단계: `vite-ssg` 프리렌더 (정적 페이지), 3단계: JSON-LD (Organization/Product)

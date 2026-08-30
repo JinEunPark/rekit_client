@@ -8,6 +8,7 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "gen-sitemap": "node scripts/gen-sitemap.mjs",
+    "gen-og": "node scripts/gen-og.mjs",
     "build-only": "npm run gen-sitemap && vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
@@ -22,6 +23,7 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.12.2",
     "@vitejs/plugin-vue": "^6.0.6",
