@@ -4,11 +4,10 @@ import RekitLogo from '@/components/ds/RekitLogo.vue'
 
 // 사업자등록증 상 정보와 완전히 일치해야 함 (전자상거래법 §10 표시 의무)
 const BUSINESS_INFO = [
-  { label: '상호명', value: '주식회사 리킷' },
-  { label: '대표자명', value: '홍길동' },
-  { label: '사업자등록번호', value: '000-00-00000' },
-  { label: '사업장 주소', value: '서울특별시 강남구 테헤란로 000, 0층' },
-  { label: '유선번호', value: '070-0000-0000' },
+  { label: '상호명', value: '리키트(REKIT)' },
+  { label: '대표자명', value: '박진은' },
+  { label: '사업자등록번호', value: '326-49-01161' },
+  { label: '사업장 주소', value: '인천광역시 강화군 강화읍 강화대로 191-14, 102동 6층 8호(강화현대아파트)' },
 ] as const
 </script>
 
