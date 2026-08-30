@@ -1,5 +1,13 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+
+# SEO 프리렌더(scripts/prerender.mjs)용 Chromium.
+# puppeteer 번들 크로미움은 musl(alpine)에서 안 돌아가므로 apk 패키지를 쓰고 다운로드는 건너뜀.
+# Chromium 없이 빌드해도 prerender 스크립트가 graceful-skip 하지만, 그러면 프리렌더 효과가 사라짐.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
