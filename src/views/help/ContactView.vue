@@ -7,6 +7,12 @@ import IconBase from '@/components/ds/IconBase.vue'
 import { submitContact, CONTACT_TITLE_MAX_LENGTH, CONTACT_CONTENT_MIN_LENGTH } from '@/api/help'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { usePageSeo } from '@/composables/usePageSeo'
+
+usePageSeo({
+  title: '1:1 문의',
+  description: '주문·배송·상품 문의를 남기면 rekit 고객센터가 순차적으로 답변드립니다.',
+})
 
 const auth = useAuthStore()
 

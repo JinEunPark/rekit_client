@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useHead } from '@unhead/vue'
 import IconBase from '@/components/ds/IconBase.vue'
+
+// 존재하지 않는 경로 — 어떤 URL로 들어오든 색인 제외.
+useHead({
+  title: '페이지를 찾을 수 없습니다 · rekit',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
+})
 </script>
 
 <template>

@@ -7,8 +7,15 @@ import ProductCard from '@/components/products/ProductCard.vue'
 import HomePromiseModal from '@/components/home/HomePromiseModal.vue'
 import { useHomeViewModel } from './HomeViewModel'
 import { useCategoryStore } from '@/stores/categories'
+import { usePageSeo } from '@/composables/usePageSeo'
 import type { ApplianceKind } from '@/data/products'
 import type { IconName } from '@/design/icons'
+
+usePageSeo({
+  title: 'rekit · 폐업 가전 직거래 플랫폼',
+  description:
+    '폐업한 카페·식당·매장에서 나온 영업용 가전을 전수 검수한 뒤 직거래하는 마켓. 냉장고·제빙기·주방기기 등 상업용 가전을 새 제품 대비 평균 73% 할인가로 만나보세요.',
+})
 
 const APPLIANCE_KINDS = new Set<ApplianceKind>([
   'fridge',

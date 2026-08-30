@@ -1,18 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { useHead } from '@unhead/vue'
 import RekitLogo from '@/components/ds/RekitLogo.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import MobileTabBar from '@/components/layout/MobileTabBar.vue'
 import { useAuthStore } from '@/stores/auth'
+import { isPrivatePath } from '@/composables/usePageSeo'
 
 const route = useRoute()
 const auth = useAuthStore()
 
 onMounted(() => {
   void auth.fetchMe()
+})
+
+// 색인 허용/차단을 경로 기준으로 전역 관리. 개별 뷰는 title·description 만 선언한다.
+useHead({
+  htmlAttrs: { lang: 'ko' },
+  meta: [
+    {
+      name: 'robots',
+      content: () => (isPrivatePath(route.path) ? 'noindex, nofollow' : 'index, follow'),
+    },
+  ],
 })
 
 const isDesignFrame = computed(() => route.path.startsWith('/_design/'))

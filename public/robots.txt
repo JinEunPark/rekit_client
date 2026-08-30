@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /admin
+Disallow: /my
+Disallow: /cart
+Disallow: /checkout
+Disallow: /auth
+Disallow: /search
+Disallow: /_design
+
+Sitemap: https://rekit.co.kr/sitemap.xml

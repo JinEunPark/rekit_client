@@ -6,6 +6,12 @@ import Badge from '@/components/ds/Badge.vue'
 import { getNotices, type NoticeListItem } from '@/api/help'
 import { ApiError } from '@/api/client'
 import { formatDate } from '@/design/tokens'
+import { usePageSeo } from '@/composables/usePageSeo'
+
+usePageSeo({
+  title: '공지사항',
+  description: '서비스 점검, 정책 변경, 배송 일정 등 rekit의 공식 공지사항입니다.',
+})
 
 const notices = ref<NoticeListItem[]>([])
 const loading = ref(true)

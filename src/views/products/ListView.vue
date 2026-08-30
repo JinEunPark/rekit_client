@@ -12,11 +12,23 @@ import {
 import type { Grade } from '@/data/products'
 import { useListViewModel } from './ListViewModel'
 import { useCategoryStore } from '@/stores/categories'
+import { usePageSeo } from '@/composables/usePageSeo'
 
 const route = useRoute()
 const router = useRouter()
 const vm = useListViewModel()
 const categoryStore = useCategoryStore()
+
+usePageSeo({
+  // 필터·정렬 조합마다 색인되지 않도록 canonical 은 항상 /products 로 고정.
+  path: '/products',
+  title: () => {
+    const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+    return q ? `'${q}' 검색 결과` : '전체 상품'
+  },
+  description:
+    '검수를 마친 폐업 매장 영업용 가전 전체 목록. 카테고리·등급·보증 여부로 필터링하고 최저가순으로 정렬해 보세요.',
+})
 
 /* ---------------------------------- */
 /* URL <-> filters                    */

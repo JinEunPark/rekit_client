@@ -13,6 +13,7 @@ import { useCartStore } from '@/stores/cart'
 import { useWishlistStore } from '@/stores/wishlist'
 import { useCategoryStore } from '@/stores/categories'
 import { useDetailViewModel } from './DetailViewModel'
+import { usePageSeo } from '@/composables/usePageSeo'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,19 @@ const vm = useDetailViewModel()
 
 const productId = computed(() => route.params.id as string)
 const product = computed(() => vm.product.value)
+
+usePageSeo({
+  title: () => {
+    const p = product.value
+    return p ? `${p.title} — ${won(p.price)}` : '상품 상세'
+  },
+  description: () => {
+    const p = product.value
+    if (!p) return '검수를 마친 폐업 매장 영업용 가전 상세 정보.'
+    return `${p.brand} ${p.title} (${p.year}, 검수등급 ${p.grade}). 정가 ${won(p.original)} → rekit ${won(p.price)}. 폐업 매장에서 나온 영업용 가전을 전수 검수 후 판매합니다.`
+  },
+  image: () => vm.images.value[0]?.url,
+})
 
 const PLACEHOLDER_THUMBS: { l: string; t: Tone; hasLabel: boolean }[] = [
   { l: '정면', t: 'mint', hasLabel: true },

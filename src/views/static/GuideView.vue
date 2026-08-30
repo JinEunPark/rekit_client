@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import IconBase from '@/components/ds/IconBase.vue'
 import StaticPage from '@/components/layout/StaticPage.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
 import type { IconName } from '@/design/icons'
+
+usePageSeo({
+  title: '이용 가이드',
+  description:
+    '폐업 매장 입고부터 전수 검수, 등급 산정(A/B/C), 직배송·화물택배까지 rekit이 가전을 재유통하는 전 과정을 안내합니다.',
+})
 
 const steps: { i: IconName; t: string; b: string }[] = [
   { i: 'truck', t: '폐업 매장 입고', b: '협력 정리 업체에서 폐업 매장의 가전을 회수해 물류센터로 가져와요. 카페·식당·매장에서 쓰던 영업용 가전이 많아요.' },

@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import StaticPage from '@/components/layout/StaticPage.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
+
+usePageSeo({
+  title: '이용약관',
+  description: 'rekit 서비스 이용약관. 회원, 주문·결제, 배송, 청약철회 및 환불 등에 관한 회사와 이용자의 권리·의무를 정합니다.',
+})
 </script>
 
 <template>

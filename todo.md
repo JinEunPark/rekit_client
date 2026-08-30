@@ -109,7 +109,16 @@
 - [ ] 글로벌 Toast / 에러 바운더리 (현재 view마다 actionError ref)
 - [ ] 낙관적 업데이트 (장바구니 수량, 위시리스트 토글)
 - [ ] 접근성 (aria-label, 포커스 링, 키보드 내비)
-- [ ] SEO (`<title>`, `<meta>`, OG)
+- SEO — 1단계 완료 (2026-08-30 세션)
+  - ✅ `@unhead/vue` 도입 (`main.ts` 플러그인, `src/composables/usePageSeo.ts` 헬퍼)
+  - ✅ 라우트별 `<title>`·`description`·`canonical`·OG/트위터 메타 — 홈/상품목록/상품상세/소개/가이드/FAQ/문의/공지/약관/개인정보
+  - ✅ `index.html` `lang="ko"` + 기본 메타, `public/robots.txt`, `public/sitemap.xml`(`scripts/gen-sitemap.mjs`, build 시 자동 생성)
+  - ✅ 비공개 경로(`/admin` `/my` `/cart` `/checkout` `/auth` `/search` `/_design`)·404 는 `noindex` (App.vue 전역 처리)
+  - [ ] `public/og-cover.png` 제작 (1200×630) — 현재 메타는 경로만 참조, 파일 없음
+  - [ ] 배포 후: Google Search Console 도메인 등록 → sitemap 제출 → 주요 URL 색인 요청
+  - [ ] 가비아 호스팅 `.htaccess` SPA fallback + `www`→루트 301
+  - [ ] 2단계: `vite-ssg` 프리렌더 (정적 페이지), 3단계: JSON-LD (Organization/Product)
+  - [ ] `docs/api.md` 등 `rekit.kr` → `rekit.co.kr` 참조 정리
 - [ ] CI: type-check + build 자동화
 
 ---

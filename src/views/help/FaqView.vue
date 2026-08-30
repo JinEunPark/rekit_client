@@ -4,6 +4,12 @@ import StaticPage from '@/components/layout/StaticPage.vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import { getFaqs, type FaqItem } from '@/api/help'
 import { ApiError } from '@/api/client'
+import { usePageSeo } from '@/composables/usePageSeo'
+
+usePageSeo({
+  title: '자주 묻는 질문',
+  description: '배송, 검수 등급, 반품·환불, A/S 등 rekit 이용 중 자주 묻는 질문을 모았습니다.',
+})
 
 const faqs = ref<FaqItem[]>([])
 const loading = ref(true)
