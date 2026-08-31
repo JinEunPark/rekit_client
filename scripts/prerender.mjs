@@ -81,6 +81,16 @@ for (const { path } of PUBLIC_ROUTES) {
       .catch(() => {})
     await new Promise((r) => setTimeout(r, SETTLE_MS))
 
+    // 스냅샷에 일시적 오버레이 상태가 굳지 않도록 정리한다.
+    // 홈 최초 진입 모달(HomePromiseModal)이 body 스크롤을 잠근 채 캡처되면,
+    // 이 index.html 을 SPA fallback 으로 쓰는 모든 비프리렌더 라우트
+    // (/admin/*, /products/:id, /cart, /my/* …)에서 스크롤이 완전히 막힌다.
+    await page.evaluate(() => {
+      document.querySelectorAll('[role="dialog"]').forEach((el) => el.remove())
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    })
+
     const html = await page.content()
     if (path === '/') {
       await writeFile(join(DIST, 'index.html'), html)
