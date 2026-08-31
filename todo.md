@@ -58,6 +58,7 @@
 - ✅ `/admin/members/:id` — 회원 상세 뷰 신규 (기본정보/구매활동/인증상태)
 - ✅ 상품 이미지 드래그 앤 드롭 순서변경 (기존 화살표 버튼과 병행 — 키보드 접근성 유지)
 - ✅ `/admin/products/new` 폼 정리 — 브랜드/제조연도가 클릭해도 반응 없는 가짜 드롭다운 버튼이라 값이 아예 저장 안 되던 문제 수정(실제 input으로 교체), 카테고리 select 화살표 위치가 다른 필드와 어긋나 보이던 문제 수정, 백엔드 스키마에 없어 저장되지도 않던 "배송/A/S 정보" 카드 제거(재고 수량만 가격 정보 카드로 이동), 상품 이미지 최소 등록 수 4장→2장으로 변경(`ProductImageEditor` 기본값 기준으로 등록/수정 화면 통일), 미리보기 썸네일이 이미지 업로드해도 계속 placeholder만 보여주던 버그 수정
+- ✅ `/admin/products/{new,:id/edit}` 데스크톱 사이드바 스크롤 문제 수정 — `.aside`가 뷰포트보다 길 때 `position: sticky`로 하단(등록 체크리스트·등록 버튼)이 가려져 스크롤로 닿을 수 없던 문제. `max-height: calc(100vh - 88px - 24px)` + `overflow-y: auto`로 넘칠 때만 내부 스크롤 허용
 
 ### API 연동 완료 목록
 - ✅ Auth: sign-in/up/out, refresh, find-id, find-password, social callback

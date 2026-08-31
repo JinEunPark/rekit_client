@@ -711,6 +711,11 @@ async function handleSave(asDraft = false) {
   .aside {
     position: sticky;
     top: 88px;
+    /* 사이드바가 뷰포트보다 길면 sticky 로 아래쪽(체크리스트·등록 버튼)이
+       가려져 스크롤로 닿을 수 없다 → 넘칠 때만 내부 스크롤을 허용한다. */
+    max-height: calc(100vh - 88px - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 </style>
