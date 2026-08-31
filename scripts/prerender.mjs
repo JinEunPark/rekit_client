@@ -68,8 +68,14 @@ try {
 }
 
 let ok = 0
+let failed = false
 for (const { path } of PUBLIC_ROUTES) {
   const page = await browser.newPage()
+  // 프리렌더 중임을 앱에 알린다. 일시적 UI(모달 등)는 이 플래그를 보고
+  // 스냅샷에 스스로 빠진다. 실제 사용자 브라우저엔 이 플래그가 없다.
+  await page.evaluateOnNewDocument(() => {
+    window.__PRERENDER__ = true
+  })
   try {
     await page.goto(`http://127.0.0.1:${PORT}${path}`, {
       waitUntil: 'domcontentloaded',
@@ -92,6 +98,17 @@ for (const { path } of PUBLIC_ROUTES) {
     })
 
     const html = await page.content()
+
+    // 회귀 방지: <body>/<html> 에 스크롤을 막는 인라인 스타일이 남았는지 검사한다.
+    // 프리렌더가 어떤 이유로든 스크롤 잠금을 캡처하면, 이 HTML 을 SPA fallback 으로
+    // 쓰는 라우트 전체가 스크롤 불가가 된다 → 조용히 배포되지 않게 빌드를 실패시킨다.
+    const rootTags = (html.match(/<(?:body|html)\b[^>]*>/gi) || []).join(' ')
+    if (/overflow\s*:\s*hidden|position\s*:\s*fixed/i.test(rootTags)) {
+      failed = true
+      console.error(`  ✗ ${path} — 루트 요소에 스크롤 잠금 스타일이 굳음: ${rootTags.trim()}`)
+      continue
+    }
+
     if (path === '/') {
       await writeFile(join(DIST, 'index.html'), html)
     } else {
@@ -115,3 +132,7 @@ for (const { path } of PUBLIC_ROUTES) {
 await browser.close()
 server.close()
 console.log(`prerender: ${ok}/${PUBLIC_ROUTES.length} 라우트 완료`)
+if (failed) {
+  console.error('prerender: ✗ 스크롤 잠금이 스냅샷에 포함됨 — 빌드 중단')
+  process.exit(1)
+}

@@ -59,6 +59,10 @@ function unlockBodyScroll() {
 }
 
 onMounted(() => {
+  // 프리렌더(scripts/prerender.mjs)의 헤드리스 브라우저에서는 모달을 띄우지 않는다.
+  // 열린 상태가 스냅샷에 굳으면 body 스크롤 잠금이 정적 HTML 에 박혀,
+  // 이 HTML 을 SPA fallback 으로 쓰는 라우트 전체의 스크롤이 막힌다.
+  if (typeof window !== 'undefined' && window.__PRERENDER__) return
   window.addEventListener('keydown', onKeydown)
   if (typeof localStorage !== 'undefined') {
     const dismissed = localStorage.getItem(STORAGE_KEY)
