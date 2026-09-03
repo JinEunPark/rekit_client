@@ -13,21 +13,77 @@ import type { Grade } from '@/data/products'
 import { useListViewModel } from './ListViewModel'
 import { useCategoryStore } from '@/stores/categories'
 import { usePageSeo } from '@/composables/usePageSeo'
+import type { BackendCategory } from '@/api/catalog'
 
 const route = useRoute()
 const router = useRouter()
 const vm = useListViewModel()
 const categoryStore = useCategoryStore()
 
+/**
+ * 카테고리별 SEO 카피. "업소용 중고 ○○" 계열 검색어를 정조준한다.
+ * h1 은 화면에 보이는 제목, title/desc 는 <head> 메타.
+ */
+const CATEGORY_SEO: Partial<Record<BackendCategory, { h1: string; title: string; desc: string }>> = {
+  REFRIGERATOR: {
+    h1: '업소용 중고 냉장고',
+    title: '업소용 중고 냉장고 - 영업용 냉장고·냉동고 직거래 | rekit',
+    desc: '폐업 카페·식당에서 나온 업소용 중고 냉장고·냉동고·테이블냉장고를 전수 검수 후 직거래. 정가 대비 평균 73% 할인, 동작보증 상품은 별도 표시.',
+  },
+  WASHING_MACHINE: {
+    h1: '업소용 중고 세탁기',
+    title: '업소용 중고 세탁기 - 영업용 세탁기·건조기 직거래 | rekit',
+    desc: '폐업 매장·숙박업소에서 나온 업소용 중고 세탁기와 건조기를 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+  TV: {
+    h1: '중고 TV·디스플레이',
+    title: '업소용 중고 TV - 매장용 대형 TV·디스플레이 직거래 | rekit',
+    desc: '폐업 매장에서 나온 중고 TV·대형 디스플레이를 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+  AIR_CONDITIONER: {
+    h1: '업소용 중고 에어컨',
+    title: '업소용 중고 에어컨 - 영업용 스탠드·천장형 에어컨 직거래 | rekit',
+    desc: '폐업 카페·식당·매장에서 나온 업소용 중고 에어컨(스탠드형·천장형)을 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+  KITCHEN: {
+    h1: '업소용 중고 주방가전',
+    title: '업소용 중고 주방기기 - 제빙기·튀김기·가스레인지 직거래 | rekit',
+    desc: '폐업 식당·카페에서 나온 업소용 중고 주방기기(제빙기·튀김기·가스레인지·전자레인지)를 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+  VACUUM: {
+    h1: '중고 청소기',
+    title: '업소용 중고 청소기 - 영업용 청소기 직거래 | rekit',
+    desc: '폐업 매장에서 나온 업소용 중고 청소기를 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+  ETC: {
+    h1: '중고 가전',
+    title: '업소용 중고가전 - 기타 영업용 가전 직거래 | rekit',
+    desc: '폐업 매장에서 나온 다양한 업소용 중고가전을 전수 검수 후 직거래. 정가 대비 평균 73% 할인가.',
+  },
+}
+
+const DEFAULT_LIST_SEO = {
+  h1: '업소용 중고가전 전체',
+  title: '업소용 중고가전 전체 - 폐업 매장 영업용 가전 목록 | rekit',
+  desc: '검수를 마친 폐업 매장 업소용 중고가전 전체 목록. 냉장고·에어컨·주방기기 등을 카테고리·등급·동작보증으로 필터링하고 최저가순으로 정렬해 보세요.',
+}
+
+/** 현재 라우트 기준 카테고리 SEO 엔트리 (q 검색 중이면 무시). */
+const listSeo = computed(() => {
+  const slug = asString(route.query.cat, 'all')
+  if (!slug || slug === 'all') return DEFAULT_LIST_SEO
+  const id = categoryStore.bySlug(slug)?.id
+  return (id && CATEGORY_SEO[id]) || DEFAULT_LIST_SEO
+})
+
 usePageSeo({
   // 필터·정렬 조합마다 색인되지 않도록 canonical 은 항상 /products 로 고정.
   path: '/products',
   title: () => {
     const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
-    return q ? `'${q}' 검색 결과` : '전체 상품'
+    return q ? `'${q}' 검색 결과` : listSeo.value.title
   },
-  description:
-    '검수를 마친 폐업 매장 영업용 가전 전체 목록. 카테고리·등급·보증 여부로 필터링하고 최저가순으로 정렬해 보세요.',
+  description: () => listSeo.value.desc,
 })
 
 /* ---------------------------------- */
@@ -95,11 +151,6 @@ function clearAll() {
 /* ---------------------------------- */
 
 const filtered = computed(() => vm.items.value)
-const activeCategory = computed(() => {
-  const slug = filters.value.category
-  if (!slug || slug === 'all') return { slug: 'all', label: '전체' }
-  return categoryStore.bySlug(slug) ?? { slug: 'all', label: '전체' }
-})
 
 const hasNonCategoryFilters = computed(
   () => filters.value.grades.length > 0 || filters.value.warrantyOnly,
@@ -117,10 +168,10 @@ watch(filters, (next) => void vm.load(next), { deep: true })
     <!-- Header -->
     <header class="list__head">
       <h1 class="list__title">
-        {{ activeCategory.slug === 'all' ? '모든 가전' : activeCategory.label }}
+        {{ filters.q ? `‘${filters.q}’ 검색 결과` : listSeo.h1 }}
       </h1>
       <div class="list__sub">
-        검수를 통과한 폐업 매장의 영업용 가전을 만나보세요
+        검수를 통과한 폐업 매장의 업소용 중고가전을 만나보세요
       </div>
     </header>
 

@@ -48,7 +48,7 @@ export function usePageSeo(input: PageSeoInput = {}) {
 
   const fullTitle = computed(() => {
     const t = toValue(input.title)
-    if (!t) return `${SITE_NAME} · 폐업 가전 직거래 플랫폼`
+    if (!t) return `${SITE_NAME} · 업소용 중고가전 직거래 플랫폼`
     return t.endsWith(SITE_NAME) ? t : `${t}${TITLE_SUFFIX}`
   })
   const description = computed(() => toValue(input.description) ?? '')

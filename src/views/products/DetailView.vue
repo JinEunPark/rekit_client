@@ -28,7 +28,7 @@ const product = computed(() => vm.product.value)
 usePageSeo({
   title: () => {
     const p = product.value
-    return p ? `${p.title} — ${won(p.price)}` : '상품 상세'
+    return p ? `${p.brand ? p.brand + ' ' : ''}${p.title} 중고 — ${won(p.price)} | rekit` : '상품 상세'
   },
   description: () => {
     const p = product.value
