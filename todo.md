@@ -136,6 +136,16 @@
   - [ ] `www`→루트 301
   - [ ] 3단계: JSON-LD (Organization/Product), 상품 상세 프리렌더(백엔드 연동 후)
   - [ ] `docs/api.md` 등 `rekit.kr` → `rekit.co.kr` 참조 정리
+  - **🧪 직접 테스트 (2026-09-05, 키워드 커밋 `7c49c05` 배포 후)**
+    - [ ] 로컬 확인: `npm run build && npx serve dist` → 브라우저 탭 제목이 홈="업소용 중고가전 직거래…", `/products`="업소용 중고가전 전체…" 로 뜨는지
+    - [ ] `/products?cat=refrigerator` 진입 시 화면 h1 이 "업소용 중고 냉장고", 탭 제목도 "업소용 중고 냉장고 - 영업용 냉장고·냉동고…" 로 바뀌는지 (에어컨·주방·세탁기도 각각 다르게)
+    - [ ] `/products?q=제빙기` 검색 시 h1·제목이 "'제빙기' 검색 결과" 로 (카테고리 카피 안 나와야)
+    - [ ] 상품 상세 탭 제목이 "브랜드 모델명 중고 — 890,000원 | rekit" 형태인지
+    - [ ] 홈 sr-only h1 이 화면엔 안 보이는데(레이아웃 안 밀림) 개발자도구 Elements 엔 있는지, 모바일에서도 깨진 여백 없는지
+    - [ ] **배포 후 프로덕션**: `curl -s https://rekit.co.kr/ | grep '<title>'` / `curl -s https://rekit.co.kr/products/ | grep '<title>'` 새 제목 나오는지 (nginx `try_files` 확인 겸)
+    - [ ] 배포 후 Google Search Console → URL 검사로 `https://rekit.co.kr/` 와 `/products` "실사용 테스트" → 렌더된 HTML 에 새 title/h1 보이는지 → 색인 요청
+    - [ ] 네이버 서치어드바이저 → 웹페이지 수집 요청 (홈 + /products)
+    - [ ] 카카오톡/슬랙에 https://rekit.co.kr 링크 붙여넣어 미리보기 제목·설명·이미지(og-cover) 정상인지
 - [ ] CI: type-check + build 자동화
 
 ---
