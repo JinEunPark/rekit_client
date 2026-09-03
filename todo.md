@@ -49,6 +49,7 @@
   - `CompleteView.vue`: 무통장 입금안내 카드 제거, confirm 응답의 카드사·할부 정보 표기("신한카드 1234 · 일시불")
   - `src/api/admin/payments.ts` → `src/api/payments.ts` 이동(buyer 플로우), `src/config/payments.ts`(공개 clientKey만), `src/composables/usePaymentHandoff.ts`(승인 결과 sessionStorage 핸드오프)
   - 키: `.env.local`의 `VITE_TOSS_CLIENT_KEY`(공개 clientKey만, 기본값=토스 문서용 테스트 키). 시크릿 키는 백엔드 전용 — 프론트에서 토스 API 직접 호출 안 함
+  - 로컬 테스트 하네스: `dev/tossMockPlugin.ts` — `.env.local`에 `TOSS_TEST_SECRET_KEY`(비-VITE) 있으면 Vite dev 서버가 `/payments/{init,confirm}`만 가로채 토스로 중계, 나머지 `/api/v1/*`는 백엔드로 프록시. 절차: [docs/payment-testing.md](docs/payment-testing.md)
   - ⚠️ 남은 것: `DepositInfoCard.vue`는 이제 미사용(무통장 복원 대비 파일만 유지). 본인 계정 테스트 clientKey/secretKey 세트로 교체 시 백엔드도 같은 계정으로 맞춰야 함
 
 ### 관리자 콘솔 (전체 완료)
