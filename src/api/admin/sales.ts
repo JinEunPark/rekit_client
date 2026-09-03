@@ -1,5 +1,5 @@
 import { apiRequest, API_BASE_URL } from '@/api/client'
-import type { PaymentMethod } from '@/api/admin/payments'
+import type { PaymentMethod } from '@/api/payments'
 
 export interface SalesSummary {
   total_revenue: number

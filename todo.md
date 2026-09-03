@@ -12,7 +12,7 @@
 | 관리자 UI | ✅ 완성 | 전 화면 구현 + API 연동 완료 |
 | 백엔드 API 연동 | 🟡 99% | 본인인증 포함 핵심 플로우 완료. 배송조회·마이페이지 최근주문 등 P2/P3 잔여 항목만 남음 |
 | RBAC | ✅ 완료 | 백엔드가 `role` 응답, 라우터 가드(`isAdmin`) 활성화됨 |
-| 결제 | 🟡 방식 변경됨 | PortOne PG → **계좌이체(무통장입금) 전용**으로 전환. 입금확인 관리 기능 필요 (아래 P1 참고) |
+| 결제 | 🟢 토스페이먼츠 위젯 연동 | 계좌이체(무통장입금) → **토스페이먼츠 결제 위젯**으로 교체. 프론트 위젯(clientKey)+백엔드 승인(`/payments/init`·`/payments/confirm`) 연동 완료 (아래 참고) |
 | 본인인증 | ✅ 완료 | Octomo QR 방식으로 실연동 (`IdentityView.vue` + `PhoneVerifyForm.vue`, `/users/me/phone/*`) |
 
 ---
@@ -26,7 +26,7 @@
 - ✅ App.vue 레이아웃 스위처 (auth focused / search focused / checkout / admin / default)
 - ✅ API 클라이언트 (`src/api/client.ts`) — JWT 자동 갱신, ApiError 클래스
 - ✅ 설계 결정 완료
-  - 결제: ~~PortOne v2~~ → **계좌이체(무통장입금) 전용**으로 실제 구현 변경됨 (`OrderView.vue` 참고, 고정 회사 계좌 + 주문번호로 입금자명 매칭). `docs/api.md` §10은 아직 PG 연동 기준으로 작성되어 실제와 불일치 — 최신화 필요
+  - 결제: ~~PortOne v2~~ → ~~계좌이체(무통장입금)~~ → **토스페이먼츠 결제 위젯**으로 확정 (`OrderView.vue` + `/checkout/payment*`, 백엔드 `/payments/init`·`/payments/confirm`). `docs/api.md` §10은 아직 옛 스펙 — 최신화 필요
   - 본인인증: PortOne v2 패스 인증 예정이나 **아직 미구현** (mock 유지 중) — ⚠️ 단, 휴대폰 번호 인증 자체는 이후 **Octomo QR 방식**으로 실연동됨(`src/api/users.ts`의 `/users/me/phone/send-verification`·`/verify`, `PhoneVerifyForm.vue`). 이 문서의 "본인인증 OTP" 관련 옛 설명(`/auth/identity/verify-*`)은 실제 구현과 다르므로 아래 P1 참고
   - 브랜드명: **rekit** 최종 확정
 - ✅ `docs/api.md` 부분 최신화 시작 — 실제 백엔드(`/openapi.json`, 79 endpoints) 기준으로 §1.3(응답이 실제로는 `{data}` 래핑 없음)·§1.5·§1.6·§2(도메인 요약표) 정정. §3~§10 섹션별 상세 재작성은 아직 안 끝남(아래 남은 작업 참고)
@@ -37,11 +37,19 @@
 - ✅ **카탈로그**: `/` (홈), `/products` (목록·필터·정렬·URL 동기화), `/products/:id` (상세)
 - ✅ **검색**: `/search` (모바일 전용) + `SearchDropdown` (데스크탑)
 - ✅ **장바구니**: `/cart` — 수량 조절, 개별/선택/전체 삭제, 배지 카운트
-- ✅ **체크아웃 3단계**: `/checkout/identity` → `/checkout/order` → `/checkout/complete`
+- ✅ **체크아웃**: `/checkout/identity` → `/checkout/order` → (토스 결제창) → `/checkout/payment`(승인) 또는 `/checkout/payment/fail`(취소·실패) → `/checkout/complete`
 - ✅ **마이페이지 7개**: `/my`, `/my/orders`, `/my/orders/:id`, `/my/wishlist`, `/my/addresses`, `/my/profile`, `/my/contacts`(+`:id`) — 내 문의내역 신규
 - ✅ **정적 7개**: `/guide`, `/about`, `/help/faq`, `/help/contact`, `/help/notice`, `/legal/terms`, `/legal/privacy`
 - ✅ **Help 상세**: `/help/notice/:id` (공지사항 상세) 신규 추가
 - ✅ **문의하기 로그인 필수 전환**: `/help/contact`가 비로그인 시 폼 대신 로그인 유도 화면 표시, 제출 성공 시 `/my/contacts`로 안내
+- ✅ **토스페이먼츠 결제 위젯 연동** — 계좌이체(무통장입금) 전용 → 토스 결제 위젯으로 교체
+  - `OrderView.vue`: 결제방법 자리에 `renderPaymentMethods` + `renderAgreement` 위젯 렌더. 결제 클릭 시 `orders.create` → `POST /payments/init`(확정 금액) → `widgets.requestPayment`(redirect)
+  - `PaymentReturnView.vue`(`/checkout/payment`, successUrl): `POST /payments/confirm` 호출. 성공→`/checkout/complete`, 422→실패 안내, 502(게이트웨이 미확정)→"결제 확인 중" 후 주문내역
+  - `PaymentFailView.vue`(`/checkout/payment/fail`, failUrl): 취소/인증실패 코드·사유 표시 + 재시도 동선
+  - `CompleteView.vue`: 무통장 입금안내 카드 제거, confirm 응답의 카드사·할부 정보 표기("신한카드 1234 · 일시불")
+  - `src/api/admin/payments.ts` → `src/api/payments.ts` 이동(buyer 플로우), `src/config/payments.ts`(공개 clientKey만), `src/composables/usePaymentHandoff.ts`(승인 결과 sessionStorage 핸드오프)
+  - 키: `.env.local`의 `VITE_TOSS_CLIENT_KEY`(공개 clientKey만, 기본값=토스 문서용 테스트 키). 시크릿 키는 백엔드 전용 — 프론트에서 토스 API 직접 호출 안 함
+  - ⚠️ 남은 것: `DepositInfoCard.vue`는 이제 미사용(무통장 복원 대비 파일만 유지). 본인 계정 테스트 clientKey/secretKey 세트로 교체 시 백엔드도 같은 계정으로 맞춰야 함
 
 ### 관리자 콘솔 (전체 완료)
 - ✅ `AdminShell` — 반응형 사이드바 (≥1024px 고정, 미만 드로어)
@@ -95,11 +103,12 @@
 - ✅ 소셜 전용 계정(`hasPassword=false`) 탈퇴 이슈 해소 — 백엔드가 `POST /auth/social/{provider}/reauth-for-withdrawal` 신규 추가(소셜 재인증으로 `withdrawalToken` 발급), `DELETE /users/me`가 `password`/`withdrawalToken` 분기 지원하도록 변경됨. 프론트 연동 완료: `src/config/oauth.ts`(purpose 플래그) · `src/views/auth/CallbackView.vue`(재인증 분기 처리) · `src/views/my/ProfileView.vue`(비밀번호 없는 계정은 소셜 재인증 버튼 노출) · `docs/api.md` §3.12/§4.1/§4.4 반영
 - [ ] 네이버 개발자센터에서 서비스 URL/Callback URL을 실제 배포 도메인(https)으로 등록 후 검수 신청
 
-#### 관리자 입금확인 처리 (신규 — 결제 방식 전환에 따른 후속 작업)
-> 결제가 PortOne PG 연동에서 **계좌이체(무통장입금) 전용**으로 바뀌면서(`OrderView.vue`), 주문은 결제 게이트웨이 검증 없이 `PENDING` 상태로 바로 생성됨. 하지만 관리자 쪽에 입금을 확인하고 `PAID`로 전환하는 수단이 없음 — `src/views/admin/OrdersView.vue`의 탭에 `PENDING`이 없고, 대응하는 액션 버튼도 없음.
-- [ ] `src/views/admin/OrdersView.vue`에 "결제대기(PENDING)" 탭 추가
-- [ ] 입금 확인 액션 추가 — 기존 `updateAdminOrderStatus(orderNumber, 'PAID')` 재사용 가능한지 백엔드 확인 후 버튼 연결
-- [ ] `docs/api.md` §10 Payments를 PG 연동 스펙 → 계좌이체 확인 플로우로 최신화 (현재 문서와 실제 구현이 어긋나 있음)
+#### 결제 (토스페이먼츠 위젯 연동 후 잔여)
+> 계좌이체(무통장입금) → 토스 결제 위젯으로 교체 완료. `orders.create` → `/payments/init` → `widgets.requestPayment` → successUrl(`/checkout/payment`)에서 `/payments/confirm`.
+- [ ] 결제 취소/중단 시 앞서 생성된 `PENDING` 주문 정리 — 현재는 `PaymentReturnView`/`OrderView`가 취소된 주문을 남겨둠(재시도 시 새 주문 생성). 백엔드 만료 처리 또는 프론트 `orders.cancel` 정리 결정 필요
+- [ ] `DepositInfoCard.vue` 제거 여부 결정 (무통장 복원 대비 현재는 미사용 파일로 유지)
+- [ ] 가상계좌(`WAITING_FOR_DEPOSIT`) 선택 시 입금 안내 화면 — 현재 `CompleteView` PENDING 분기는 "결제 확인 중" 문구만
+- [ ] `docs/api.md` §10 Payments를 토스 위젯 + `/payments/init`·`/payments/confirm` 기준으로 최신화
 
 ### P2 — 마이페이지 잔여 항목
 - [ ] 배송 조회 버튼 — `src/views/my/OrdersView.vue`, `src/views/my/MyView.vue`의 "배송조회" 버튼이 현재 클릭 핸들러 없는 no-op. `GET /orders/:id/tracking` 연동 필요
@@ -133,6 +142,6 @@
 | # | 항목 | 상태 |
 |---|------|------|
 | D7 | 다크 모드 지원 여부 | 디자인엔 없음, 보류 |
-| D8 | 결제: PortOne PG 통합 재도입 여부 | 현재 계좌이체 전용으로 구현되어 있음. PG 재도입 계획이 있다면 확인 필요 — 없다면 `docs/api.md` §10을 계좌이체 기준으로 다시 쓰는 게 맞음 |
+| D8 | ~~결제 PG 재도입 여부~~ | ✅ 해결 — 토스페이먼츠 결제 위젯으로 확정, 연동 완료. `docs/api.md` §10 최신화만 남음 |
 
 > D1(백엔드), D2(소셜 로그인 일부), D5(이미지 호스팅 — 실연동 완료로 해소), D6(RBAC) 모두 결정 완료. D3/D4(PortOne)는 실제 구현이 계좌이체로 바뀌어 D8로 재오픈.

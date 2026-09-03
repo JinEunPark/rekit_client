@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeMount } from 'vue'
+import { computed, onBeforeMount, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
-import Button from '@/components/ds/Button.vue'
-import DepositInfoCard from '@/components/checkout/DepositInfoCard.vue'
 import { useOrderStore } from '@/stores/orders'
 import { statusLabel } from '@/stores/orders-helpers'
+import { readPaymentResult } from '@/composables/usePaymentHandoff'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,16 +18,28 @@ const orderNumber = computed(() => {
 
 const order = computed(() => (orderNumber.value ? orders.findByNumber(orderNumber.value) : undefined))
 
+/** 결제 리턴 페이지에서 넘어온 승인 결과 (카드사·할부 정보). 새로고침하면 사라짐. */
+const payment = ref(orderNumber.value ? readPaymentResult(orderNumber.value) : null)
+
 onBeforeMount(async () => {
   if (!orderNumber.value) { router.replace('/'); return }
   if (!order.value) await orders.fetchOrder(orderNumber.value)
   if (!order.value) router.replace('/')
 })
 
-const isPending = computed(() => order.value?.status === 'PENDING')
 const isApproved = computed(() => {
   const s = order.value?.status
   return s === 'PAID' || s === 'PREPARING' || s === 'SHIPPING' || s === 'DELIVERED'
+})
+
+/** "신한카드 1234 · 일시불" 형태의 결제수단 표기. */
+const paymentLine = computed(() => {
+  const p = payment.value
+  if (!p || !p.card_company) return ''
+  const last4 = p.card_last4 ? ` ${p.card_last4}` : ''
+  const plan =
+    p.installment_months && p.installment_months > 0 ? `${p.installment_months}개월` : '일시불'
+  return `${p.card_company}${last4} · ${plan}`
 })
 
 function shippingLabel(method?: string) {
@@ -53,26 +64,19 @@ function shippingNote(method?: string) {
 
     <main class="hero" :class="{ 'hero--pending': !isApproved }">
       <div class="hero__check">
-        <IconBase :name="isApproved ? 'check' : 'wallet'" :size="36" :stroke="2.6" />
+        <IconBase :name="isApproved ? 'check' : 'refresh'" :size="36" :stroke="2.6" />
       </div>
       <div class="hero__kicker">
-        {{ isApproved ? '결제가 확인됐어요' : '주문이 접수됐어요' }}
+        {{ isApproved ? '결제가 완료됐어요' : '결제를 확인하고 있어요' }}
       </div>
       <h1 class="hero__title">
         <template v-if="isApproved">새 주인을 만난 가전,<br />곧 도착할게요</template>
-        <template v-else>입금 후 배송이 시작됩니다</template>
+        <template v-else>잠시 후 배송이 시작됩니다</template>
       </h1>
       <div class="hero__order">
         주문번호 <b class="hero__id">{{ order.orderNumber }}</b>
       </div>
     </main>
-
-    <!-- 입금 안내 카드 (결제대기) -->
-    <DepositInfoCard
-      v-if="isPending"
-      :amount="order.totalAmount"
-      :order-id="order.orderNumber"
-    />
 
     <!-- 결제 정보 (요약) -->
     <section class="card">
@@ -82,7 +86,7 @@ function shippingNote(method?: string) {
         <span class="card__total-v">{{ won(order.totalAmount) }}</span>
       </div>
       <div class="card__sub">
-        <span>{{ shippingLabel(order.shippingMethod) }}</span>
+        <span>{{ paymentLine || shippingLabel(order.shippingMethod) }}</span>
         <span>{{ statusLabel(order.status) }}</span>
       </div>
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from 'vue'
+import { computed, nextTick, onBeforeMount, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { loadTossPayments, ANONYMOUS, type TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk'
 import { won } from '@/design/tokens'
 import IconBase from '@/components/ds/IconBase.vue'
-import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import CheckoutSteps from '@/components/checkout/CheckoutSteps.vue'
@@ -16,6 +16,13 @@ import type { ShipmentMethod } from '@/api/orders'
 import { toNumId } from '@/stores/utils'
 import { useAddressStore } from '@/stores/addresses'
 import { ApiError } from '@/api/client'
+import { initPayment, type PaymentMethod } from '@/api/payments'
+import {
+  TOSS_CLIENT_KEY,
+  TOSS_PAYMENT_METHOD_VARIANT,
+  TOSS_AGREEMENT_VARIANT,
+  tossCustomerKey,
+} from '@/config/payments'
 
 type DeliveryMethod = 'direct' | 'cargo'
 
@@ -82,17 +89,83 @@ const shippingFee = computed(
   () => deliveryOptions.find((o) => o.key === deliveryMethod.value)?.fee ?? 0,
 )
 
-/* ────────────── Payment ────────────── */
-
-// 계좌이체(무통장입금) only — fixed company account, deposit-name matching by orderId.
-const paymentLabel = '계좌이체 (무통장입금)'
-
 /* ────────────── Totals ────────────── */
 
 const itemsTotal = computed(() =>
   snapshot.value.reduce((sum, s) => sum + (s.product?.price ?? 0) * s.qty, 0),
 )
 const finalTotal = computed(() => itemsTotal.value + shippingFee.value)
+
+/* ────────────── Payment (토스페이먼츠 결제 위젯) ────────────── */
+
+let widgets: TossPaymentsWidgets | null = null
+let paymentMethodWidget: Awaited<ReturnType<TossPaymentsWidgets['renderPaymentMethods']>> | null = null
+const widgetsReady = ref(false)
+const widgetsError = ref('')
+
+async function initWidgets() {
+  if (widgets) return
+  try {
+    const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
+    const customerKey = auth.user ? tossCustomerKey(auth.user.loginId) : ANONYMOUS
+    widgets = tossPayments.widgets({ customerKey })
+    await widgets.setAmount({ currency: 'KRW', value: finalTotal.value })
+    const [methodWidget] = await Promise.all([
+      widgets.renderPaymentMethods({
+        selector: '#toss-payment-method',
+        variantKey: TOSS_PAYMENT_METHOD_VARIANT,
+      }),
+      widgets.renderAgreement({
+        selector: '#toss-agreement',
+        variantKey: TOSS_AGREEMENT_VARIANT,
+      }),
+    ])
+    paymentMethodWidget = methodWidget
+    widgetsReady.value = true
+  } catch (err) {
+    console.error('[toss] widget init', err)
+    widgetsError.value = '결제 수단을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'
+  }
+}
+
+/** 위젯에서 고른 결제수단을 백엔드 enum 으로 매핑. 알 수 없으면 CARD. */
+async function selectedPaymentMethod(): Promise<PaymentMethod> {
+  try {
+    const selected = await paymentMethodWidget?.getSelectedPaymentMethod()
+    switch (selected?.code) {
+      case 'TRANSFER':
+      case 'VIRTUAL_ACCOUNT':
+        return 'BANK'
+      case 'TOSSPAY':
+        return 'TOSS_PAY'
+      case 'NAVERPAY':
+        return 'NAVER_PAY'
+      case 'KAKAOPAY':
+        return 'KAKAO_PAY'
+      default:
+        return 'CARD'
+    }
+  } catch {
+    return 'CARD'
+  }
+}
+
+// 스냅샷 로딩이 끝나 결제 위젯 DOM(#toss-payment-method)이 그려진 뒤 초기화
+watch(
+  [snapshotLoading, () => snapshot.value.length],
+  async ([loading, len]) => {
+    if (!loading && len > 0 && !widgets) {
+      await nextTick()
+      void initWidgets()
+    }
+  },
+  { immediate: true },
+)
+
+// 배송 방식 변경 등으로 결제 금액이 바뀌면 위젯에 반영
+watch(finalTotal, (value) => {
+  if (widgets) void widgets.setAmount({ currency: 'KRW', value })
+})
 
 /* ────────────── Validation ────────────── */
 
@@ -109,6 +182,11 @@ async function pay() {
     return
   }
 
+  if (!widgetsReady.value || !widgets) {
+    payError.value = widgetsError.value || '결제 수단을 불러오는 중이에요. 잠시 후 다시 시도해 주세요.'
+    return
+  }
+
   paying.value = true
   payError.value = ''
 
@@ -120,6 +198,7 @@ async function pay() {
       : deliveryMethod.value === 'cargo' ? 'FREIGHT'
       : 'PARCEL'
 
+    // 1) 주문 생성
     const order = await orders.create({
       items: snapshot.value.map((s) => ({
         product_id: parseInt(s.productId, 10),
@@ -130,20 +209,46 @@ async function pay() {
       memo: selectedAddr.value?.memo || null,
     })
 
-    snapshot.value.forEach((s) => cart.remove(s.productId))
-    router.replace(`/checkout/complete?order=${order.orderNumber}`)
+    // 2) 결제 레코드 생성 → 백엔드가 계산한 확정 금액 확보
+    const method = await selectedPaymentMethod()
+    const init = await initPayment({ order_number: order.orderNumber, method })
+    await widgets.setAmount({ currency: 'KRW', value: init.amount })
+
+    // 3) 결제창 요청 (redirect 방식) — 이후 /checkout/payment 또는 /checkout/payment/fail 로 복귀
+    const origin = window.location.origin
+    await widgets.requestPayment({
+      orderId: order.orderNumber, // 6~64자, RK-YYMMDDNNNN 포맷 유효
+      orderName: buildOrderName(),
+      successUrl: `${origin}/checkout/payment`,
+      failUrl: `${origin}/checkout/payment/fail`,
+      customerEmail: auth.user?.email || undefined,
+      customerName: init.customer_name || auth.user?.username || undefined,
+      customerMobilePhone: phoneDigits(selectedAddr.value?.phone),
+    })
   } catch (err) {
     console.error('[pay]', err)
     if (err instanceof ApiError) {
       payError.value = err.message || `오류가 발생했어요. (${err.status})`
-    } else if (err instanceof Error) {
-      payError.value = err.message
+    } else if (err && typeof err === 'object' && 'message' in err) {
+      payError.value = String((err as { message: unknown }).message) || '결제 요청이 중단됐어요.'
     } else {
       payError.value = '주문 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
     }
   } finally {
     paying.value = false
   }
+}
+
+function buildOrderName(): string {
+  const first = snapshot.value[0]?.product?.title ?? '중고가전'
+  const head = first.length > 40 ? `${first.slice(0, 40)}…` : first
+  return snapshot.value.length > 1 ? `${head} 외 ${snapshot.value.length - 1}건` : head
+}
+
+function phoneDigits(phone?: string | null): string | undefined {
+  if (!phone) return undefined
+  const digits = phone.replace(/\D/g, '')
+  return digits.length >= 8 && digits.length <= 15 ? digits : undefined
 }
 </script>
 
@@ -262,19 +367,13 @@ async function pay() {
         </div>
       </section>
 
-      <!-- Payment method (계좌이체 only) -->
+      <!-- Payment method (토스페이먼츠 결제 위젯) -->
       <section class="block">
         <h2 class="block__title">결제 방법</h2>
-        <div class="pay-only">
-          <div class="pay-only__head">
-            <IconBase name="wallet" :size="18" />
-            <span>계좌이체 (무통장입금)</span>
-          </div>
-          <p class="pay-only__b">
-            주문하기 버튼을 누르면 다음 화면에서 입금 계좌와 입금자명을 안내드립니다.
-            영업일 9~18시 기준 평균 2시간 내 입금이 확인됩니다.
-          </p>
-        </div>
+        <div id="toss-payment-method" class="toss-slot" />
+        <div id="toss-agreement" class="toss-slot" />
+        <p v-if="widgetsError" class="pay-error pay-error--left">{{ widgetsError }}</p>
+        <p v-else-if="!widgetsReady" class="toss-loading">결제 수단을 불러오는 중…</p>
       </section>
 
       <!-- Total card -->
@@ -296,8 +395,8 @@ async function pay() {
       <!-- Inline CTA (desktop) -->
       <div class="inline-cta">
         <p v-if="payError" class="pay-error">{{ payError }}</p>
-        <Button type="submit" variant="accent" size="lg" full :disabled="paying">
-          {{ paying ? '처리 중…' : won(finalTotal) + ' 주문하기' }}
+        <Button type="submit" variant="accent" size="lg" full :disabled="paying || !widgetsReady">
+          {{ paying ? '결제창을 여는 중…' : won(finalTotal) + ' 결제하기' }}
         </Button>
       </div>
     </form>
@@ -305,8 +404,8 @@ async function pay() {
     <!-- Sticky CTA (mobile) -->
     <div class="sticky-cta">
       <p v-if="payError" class="pay-error">{{ payError }}</p>
-      <Button variant="accent" size="lg" full :disabled="paying" @click="pay">
-        {{ paying ? '처리 중…' : won(finalTotal) + ' 결제하기' }}
+      <Button variant="accent" size="lg" full :disabled="paying || !widgetsReady" @click="pay">
+        {{ paying ? '결제창을 여는 중…' : won(finalTotal) + ' 결제하기' }}
       </Button>
     </div>
   </div>
@@ -635,28 +734,14 @@ async function pay() {
   font-weight: 700;
 }
 
-/* payment (계좌이체 only) */
-.pay-only {
-  background: var(--rekit-accent-soft);
-  border: 1px solid #cce4d6;
-  border-radius: 12px;
-  padding: 14px 16px;
+/* payment (토스페이먼츠 위젯) */
+.toss-slot {
+  width: 100%;
 }
-.pay-only__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--rekit-accent-ink);
-}
-.pay-only__head svg { color: var(--rekit-accent-deep); }
-.pay-only__b {
-  margin: 8px 0 0;
+.toss-loading {
+  margin: 4px 2px 0;
   font-size: 12.5px;
-  color: var(--rekit-accent-ink);
-  line-height: 1.55;
-  opacity: 0.85;
+  color: var(--rekit-ink-subtle);
 }
 
 /* total card (dark) */
@@ -706,6 +791,10 @@ async function pay() {
   font-size: 12.5px;
   color: var(--rekit-danger);
   text-align: center;
+}
+.pay-error--left {
+  margin: 8px 2px 0;
+  text-align: left;
 }
 .sticky-cta {
   position: fixed;

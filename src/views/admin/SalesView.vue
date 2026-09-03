@@ -12,7 +12,7 @@ import {
   exportSalesCsv,
 } from '@/api/admin/sales'
 import type { SalesSummary, PaymentMethodStat, TopProductItem } from '@/api/admin/sales'
-import type { PaymentMethod } from '@/api/admin/payments'
+import type { PaymentMethod } from '@/api/payments'
 
 type PeriodId = '7d' | '30d' | 'month'
 

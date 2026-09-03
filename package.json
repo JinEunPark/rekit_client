@@ -18,6 +18,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@tosspayments/tosspayments-sdk": "^2.8.1",
     "@unhead/vue": "^3.4.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.32",

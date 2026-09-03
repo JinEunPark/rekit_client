@@ -40,6 +40,8 @@ const router = createRouter({
     // Checkout
     { path: '/checkout/identity', name: 'checkout-identity', component: () => import('../views/checkout/IdentityView.vue') },
     { path: '/checkout/order', name: 'checkout-order', component: () => import('../views/checkout/OrderView.vue') },
+    { path: '/checkout/payment', name: 'checkout-payment', component: () => import('../views/checkout/PaymentReturnView.vue') },
+    { path: '/checkout/payment/fail', name: 'checkout-payment-fail', component: () => import('../views/checkout/PaymentFailView.vue') },
     { path: '/checkout/complete', name: 'checkout-complete', component: () => import('../views/checkout/CompleteView.vue') },
 
     // Static / marketing pages
