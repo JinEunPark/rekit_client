@@ -2,12 +2,15 @@
 
 ## 키
 
-| 키 | 값(토스 문서용 테스트) | 위치 |
-|---|---|---|
-| clientKey (공개) | `test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm` | 프론트 `.env.local` → `VITE_TOSS_CLIENT_KEY` |
-| secretKey (비공개) | `test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6` | **백엔드 env** 또는 로컬 테스트 시 프론트 `.env.local` → `TOSS_TEST_SECRET_KEY` (VITE_ 접두어 없음 → 번들 미포함) |
+토스 [개발자센터 → API 키](https://developers.tosspayments.com/my/api-keys) 에서 발급.
+**secretKey 값은 이 문서·저장소에 적지 않습니다** — `.env.local`(gitignore)·백엔드 env 에만.
 
-clientKey ↔ secretKey 는 같은 토스 계정 세트여야 합니다.
+| 키 | 위치 |
+|---|---|
+| clientKey (`test_gck_*`, 공개) | 프론트 `.env.local` → `VITE_TOSS_CLIENT_KEY` (미설정 시 `src/config/payments.ts` 기본값) |
+| secretKey (`test_gsk_*`, 비공개) | **백엔드 env `TOSS_SECRET_KEY`**, 또는 로컬 중계 테스트 시 프론트 `.env.local` → `TOSS_TEST_SECRET_KEY` (VITE_ 접두어 없음 → 번들 미포함) |
+
+clientKey ↔ secretKey 는 같은 토스 계정 세트여야 합니다 (안 맞으면 `INVALID_API_KEY`).
 
 ---
 
@@ -15,11 +18,11 @@ clientKey ↔ secretKey 는 같은 토스 계정 세트여야 합니다.
 
 백엔드에 `POST /api/v1/payments/init`, `POST /api/v1/payments/confirm` 이 동작할 때.
 
-1. **백엔드** `.env`: `TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6`, `USE_FAKE_PG=false` → 백엔드 실행 (`:8000`)
+1. **백엔드** `.env`: `TOSS_SECRET_KEY=test_gsk_...`(본인 계정), `USE_FAKE_PG=false` → 백엔드 실행 (`:8000`)
 2. **프론트** `.env.local`:
    ```
    VITE_API_BASE_URL=http://localhost:8000/api/v1
-   VITE_TOSS_CLIENT_KEY=test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm
+   VITE_TOSS_CLIENT_KEY=test_gck_...       # 본인 계정 clientKey
    ```
    `TOSS_TEST_SECRET_KEY` 줄은 **삭제** (있으면 Vite 중계 모드가 켜짐)
 3. `npm run dev`
@@ -35,8 +38,8 @@ Vite dev 서버가 `/payments/init`·`/payments/confirm` 만 가로채 토스로
 2. **프론트** `.env.local`:
    ```
    VITE_API_BASE_URL=/api/v1
-   VITE_TOSS_CLIENT_KEY=test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm
-   TOSS_TEST_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6
+   VITE_TOSS_CLIENT_KEY=test_gck_...        # 본인 계정 clientKey
+   TOSS_TEST_SECRET_KEY=test_gsk_...        # 본인 계정 secretKey (같은 세트)
    DEV_BACKEND_ORIGIN=http://localhost:8000
    ```
 3. `npm run dev`
