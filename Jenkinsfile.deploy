@@ -2,24 +2,45 @@ pipeline {
     agent any
 
     parameters {
-        string(
-            name: 'IMAGE_TAG',
-            defaultValue: 'latest',
-            description: '배포할 이미지 태그 (레지스트리에 push된 커밋 short sha, 또는 latest). 롤백 시 이전 sha 입력.'
+        // Git Parameter 플러그인 — 레지스트리가 아니라 git 태그 목록에서 고른다.
+        // 최초 1회는 목록이 비어 있을 수 있음 (SCM checkout 이 한 번 돌아야 태그가 채워짐).
+        gitParameter(
+            name: 'VERSION',
+            type: 'PT_TAG',
+            tagFilter: '*',
+            sortMode: 'DESCENDING_SMART',
+            selectedValue: 'TOP',
+            description: '배포할 git 태그. 그대로 두면 가장 최신 태그. 롤백은 이전 태그를 고른다.'
         )
     }
 
     environment {
         COMPOSE_PROJECT = 'rekit-client'
+        REGISTRY        = '127.0.0.1:5000'
+        IMAGE_NAME      = 'rekit-client'
     }
 
     stages {
+        stage('Check image exists') {
+            steps {
+                script {
+                    if (!params.VERSION?.trim()) {
+                        error 'VERSION 이 비었습니다. build 잡을 먼저 실행했는지 확인하세요.'
+                    }
+                }
+                sh """
+                    docker manifest inspect ${REGISTRY}/${IMAGE_NAME}:${params.VERSION} > /dev/null \
+                      || { echo '레지스트리에 ${IMAGE_NAME}:${params.VERSION} 이미지가 없습니다 — build-client 잡을 이 태그로 먼저 실행'; exit 1; }
+                """
+            }
+        }
+
         stage('Deploy') {
             steps {
-                echo "Deploying 127.0.0.1:5000/rekit-client:${params.IMAGE_TAG}"
+                echo "Deploying ${REGISTRY}/${IMAGE_NAME}:${params.VERSION}"
                 sh """
-                    IMAGE_TAG=${params.IMAGE_TAG} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml pull web
-                    IMAGE_TAG=${params.IMAGE_TAG} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml up -d web
+                    IMAGE_TAG=${params.VERSION} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml pull web
+                    IMAGE_TAG=${params.VERSION} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml up -d web
                     docker image prune -f
                 """
             }
