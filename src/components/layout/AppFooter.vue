@@ -7,6 +7,7 @@ const BUSINESS_INFO = [
   { label: '상호명', value: '리키트(REKIT)' },
   { label: '대표자명', value: '박진은' },
   { label: '사업자등록번호', value: '326-49-01161' },
+  { label: '통신판매업신고번호', value: '2026-인천강화-0171' },
   { label: '사업장 주소', value: '인천광역시 강화군 강화읍 강화대로 191-14, 102동 6층 8호(강화현대아파트)' },
 ] as const
 </script>
