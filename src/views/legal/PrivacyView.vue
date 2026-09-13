@@ -76,7 +76,7 @@ usePageSeo({
 
     <h2>7. 개인정보 보호책임자</h2>
     <ul>
-      <li>이메일 — privacy@rekit.kr</li>
+      <li>이메일 — bagjineun08@gmail.com</li>
       <li>전화 (평일 10~18시) — 1599-0000</li>
     </ul>
   </StaticPage>

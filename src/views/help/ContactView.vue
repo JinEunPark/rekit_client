@@ -113,7 +113,7 @@ async function submit(e: Event) {
     <div class="alt">
       <h2>다른 방법</h2>
       <ul>
-        <li>이메일 — <b>help@rekit.kr</b></li>
+        <li>이메일 — <b>bagjineun08@gmail.com</b></li>
         <li>전화 (평일 10~18시) — <b>1599-0000</b></li>
         <li>카카오 채널 — <b>@rekit</b></li>
       </ul>
