@@ -1,29 +1,60 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
 import ProductTile from '@/components/ds/ProductTile.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useOrderStore, type OrderStatus } from '@/stores/orders'
+import { useWishlistStore } from '@/stores/wishlist'
+import { useAddressStore } from '@/stores/addresses'
+import { statusLabel, statusTone } from '@/stores/orders-helpers'
 import type { IconName } from '@/design/icons'
 
 const router = useRouter()
 const auth = useAuthStore()
+const orderStore = useOrderStore()
+const wishlist = useWishlistStore()
+const addresses = useAddressStore()
 
-const orderCounts = [
-  { n: 1, l: '결제완료' },
-  { n: 2, l: '준비중' },
-  { n: 1, l: '배송중' },
-  { n: 5, l: '배송완료' },
+const ORDER_COUNT_STATUSES: { status: OrderStatus; label: string }[] = [
+  { status: 'PAID', label: '결제완료' },
+  { status: 'PREPARING', label: '준비중' },
+  { status: 'SHIPPING', label: '배송중' },
+  { status: 'DELIVERED', label: '배송완료' },
 ]
 
-const menus: { i: IconName; t: string; n?: string; tone?: 'accent'; to: string }[] = [
-  { i: 'heart', t: '관심상품', n: '12', to: '/my/wishlist' },
-  { i: 'map', t: '배송지 관리', n: '2', to: '/my/addresses' },
-  { i: 'shield', t: '본인인증 상태', n: '인증완료', tone: 'accent', to: '/my/profile' },
+const orderCounts = computed(() =>
+  ORDER_COUNT_STATUSES.map(({ status, label }) => ({
+    n: orderStore.orders.filter((o) => o.status === status).length,
+    l: label,
+    status,
+  })),
+)
+
+const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'PAID', 'PREPARING', 'SHIPPING']
+const activeOrder = computed(() => orderStore.orders.find((o) => ACTIVE_STATUSES.includes(o.status)))
+
+function summarizeItems(items: { titleSnapshot: string }[]) {
+  const first = items[0]
+  if (!first) return ''
+  return items.length === 1 ? first.titleSnapshot : `${first.titleSnapshot} 외 ${items.length - 1}건`
+}
+
+const menus = computed<{ i: IconName; t: string; n?: string; tone?: 'accent'; to: string }[]>(() => [
+  { i: 'heart', t: '관심상품', n: String(wishlist.count), to: '/my/wishlist' },
+  { i: 'map', t: '배송지 관리', n: String(addresses.count), to: '/my/addresses' },
+  {
+    i: 'shield',
+    t: '본인인증 상태',
+    n: auth.user?.verified ? '인증완료' : '미인증',
+    tone: 'accent',
+    to: '/my/profile',
+  },
   { i: 'info', t: '공지사항', to: '/help/notice' },
   { i: 'mail', t: '내 문의내역', to: '/my/contacts' },
-]
+])
 
 function logout() {
   auth.logout()
@@ -104,7 +135,7 @@ function logout() {
         <RouterLink
           v-for="(s, i) in orderCounts"
           :key="s.l"
-          :to="`/my/orders?status=${s.l}`"
+          :to="`/my/orders?status=${s.status}`"
           class="counts__cell"
           :class="{ 'counts__cell--last': i === orderCounts.length - 1 }"
         >
@@ -115,25 +146,33 @@ function logout() {
     </section>
 
     <!-- Recent order -->
-    <section class="block">
+    <section v-if="activeOrder" class="block">
       <div class="block__head">
         <h2>진행 중인 주문</h2>
       </div>
       <article class="recent">
         <header class="recent__head">
-          <Badge tone="info" size="sm">배송중</Badge>
-          <span class="recent__id">RK-26050001</span>
+          <Badge :tone="statusTone(activeOrder.status)" size="sm">{{ statusLabel(activeOrder.status) }}</Badge>
+          <span class="recent__id">{{ activeOrder.orderNumber }}</span>
         </header>
         <div class="recent__body">
           <div class="recent__thumb">
-            <ProductTile kind="fridge" tone="mint" ratio="1/1" radius="12px" :show-label="false" />
+            <ProductTile
+              kind="fridge"
+              tone="mint"
+              ratio="1/1"
+              radius="12px"
+              :show-label="false"
+              :image-url="activeOrder.items[0]?.imageUrlSnapshot ?? undefined"
+            />
           </div>
           <div class="recent__info">
-            <div class="recent__title">삼성 양문형 냉장고 384L 외 2건</div>
-            <div class="recent__sub">5월 3일(토) 도착 예정</div>
+            <div class="recent__title">{{ summarizeItems(activeOrder.items) }}</div>
             <div class="recent__actions">
               <Button variant="secondary" size="sm">배송조회</Button>
-              <Button variant="secondary" size="sm">주문상세</Button>
+              <RouterLink :to="`/my/orders/${activeOrder.orderNumber}`">
+                <Button variant="secondary" size="sm">주문상세</Button>
+              </RouterLink>
             </div>
           </div>
         </div>
