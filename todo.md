@@ -105,11 +105,39 @@
 - [ ] 네이버 개발자센터에서 서비스 URL/Callback URL을 실제 배포 도메인(https)으로 등록 후 검수 신청
 
 #### 결제 (토스페이먼츠 위젯 연동 후 잔여)
-> 계좌이체(무통장입금) → 토스 결제 위젯으로 교체 완료. `orders.create` → `/payments/init` → `widgets.requestPayment` → successUrl(`/checkout/payment`)에서 `/payments/confirm`.
-- [ ] 결제 취소/중단 시 앞서 생성된 `PENDING` 주문 정리 — 현재는 `PaymentReturnView`/`OrderView`가 취소된 주문을 남겨둠(재시도 시 새 주문 생성). 백엔드 만료 처리 또는 프론트 `orders.cancel` 정리 결정 필요
-- [ ] `DepositInfoCard.vue` 제거 여부 결정 (무통장 복원 대비 현재는 미사용 파일로 유지)
-- [ ] 가상계좌(`WAITING_FOR_DEPOSIT`) 선택 시 입금 안내 화면 — 현재 `CompleteView` PENDING 분기는 "결제 확인 중" 문구만
-- [ ] `docs/api.md` §10 Payments를 토스 위젯 + `/payments/init`·`/payments/confirm` 기준으로 최신화
+
+> **현재 흐름**: `orders.create` → `POST /payments/init` → `widgets.requestPayment(redirect)` →
+> successUrl `/checkout/payment`([PaymentReturnView.vue](src/views/checkout/PaymentReturnView.vue))에서
+> `POST /payments/confirm` → `/checkout/complete`. 실패·취소는 failUrl `/checkout/payment/fail`.
+> 관련 파일: `src/api/payments.ts`, `src/config/payments.ts`(공개 clientKey만), `src/composables/usePaymentHandoff.ts`.
+> 백엔드 쪽 결제 잔여 작업은 `rekle_backend/docs/todo.md` 의 "[결제] 토스페이먼츠 실연동" 참고.
+
+- [ ] **방치된 `PENDING` 주문 정리 — 백엔드와 함께 결정해야 함 (가장 중요)**
+  - 현상: 주문을 만들면 **그 시점에 재고가 깎인다.** 사용자가 결제창에서 이탈하면 주문은 `PENDING` 으로,
+    재고는 깎인 채로 남는다. 재시도하면 새 주문이 또 생겨서 재고가 중복으로 묶인다.
+  - 백엔드에 만료 로직은 있다 — `order_service.py:267 _expire_if_abandoned()` 가 30분 지난 PENDING 을
+    취소하고 재고를 복구한다. **그런데 호출 지점이 주문 "상세 조회" 하나뿐이라, 그 주문을 다시 열지 않으면
+    영원히 만료되지 않는다.** (목록 조회에서도 안 돌고 스케줄러도 없음)
+  - 즉 프론트에서 `orders.cancel` 을 호출해 정리하거나(= 이탈 시점에 즉시), 백엔드가 스윕/스케줄러를
+    붙이거나 둘 중 하나로 가야 한다. **백엔드 단독으로 고치는 게 더 안전하다** — 프론트 정리는 사용자가
+    탭을 닫아버리면 호출 자체가 안 되기 때문. 프론트는 거드는 역할(실패 페이지 진입 시 cancel 호출) 정도.
+  - 참고: `PaymentFailView`(failUrl 랜딩)는 사용자가 돌아오는 경로라 여기서 `orders.cancel` 을 호출하는 건
+    지금도 가능하다. 돌아오지 않는 경로가 문제.
+- [ ] **`src/components/checkout/DepositInfoCard.vue` 삭제** — 무통장입금 시절 잔재. 2026-10-02 확인:
+  레포 전체에서 **참조 0건**인 死파일. 무통장 복원 대비로 남겨뒀던 건데 결제수단이 토스 위젯으로 확정됐으니
+  지우면 된다 (되살릴 일이 생기면 git 히스토리에 있음).
+- [ ] **`docs/api.md` §10 Payments 전면 교체** — 지금 문서는 실제 구현과 **전혀 다른 옛 mock 스펙**이다.
+  틀린 부분: 엔드포인트 `/payments/verify` → 실제는 **`/payments/confirm`**,
+  필드명 `orderId`(camelCase) → 실제는 **`order_number`**(snake_case),
+  주문 상태 `PENDING_PAYMENT` → 실제는 **`PENDING`**, 응답의 `data` envelope → 실제로는 **없음**.
+  실제 계약(백엔드 `app/payment/payment_schemas.py` 기준):
+  - `POST /payments/init` 요청 `{order_number, method}` → 응답 `{payment_id, order_number, amount, customer_name}`
+  - `POST /payments/confirm` 요청 `{payment_key, order_id, amount}` (`order_id` 는 order_number 문자열 —
+    토스가 `orderId` 라고 부르는 값) → 응답 `{order_number, status, paid_at, card_company, card_last4, installment_months}`
+  - `POST /payments/webhooks/toss` (토스 → 서버, 프론트 무관)
+- ~~가상계좌(`WAITING_FOR_DEPOSIT`) 입금 안내 화면~~ — **폐기.** 백엔드가 2026-09-04 에 "가상계좌 미지원"으로
+  결정했다(`confirm` 이 토스 status != `DONE` 이면 거절 — 입금 전 주문 확정 방지). 실시간 계좌이체(BANK,
+  즉시 DONE)만 사용한다. `CompleteView` 의 PENDING 분기("결제 확인 중")는 그대로 둬도 된다.
 
 ### P2 — 마이페이지 잔여 항목
 - [ ] 배송 조회 버튼 — `src/views/my/OrdersView.vue`, `src/views/my/MyView.vue`의 "배송조회" 버튼이 현재 클릭 핸들러 없는 no-op. `GET /orders/:id/tracking` 연동 필요
