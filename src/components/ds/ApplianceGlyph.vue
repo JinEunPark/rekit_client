@@ -64,5 +64,33 @@ const surfaceMuted = REKIT.color.surfaceMuted
       <circle cx="50" cy="55" r="3" :fill="acc" />
       <path d="M50 27 L50 16 L62 16" :stroke="ink" stroke-width="1.4" fill="none" stroke-linecap="round" />
     </g>
+    <g v-else-if="kind === 'fryer'">
+      <rect x="12" y="34" width="76" height="50" rx="6" fill="#fff" :stroke="ink" stroke-width="1.6" />
+      <rect x="19" y="40" width="28" height="20" rx="2.5" :fill="accentSoft" :stroke="ink" stroke-width="1.1" />
+      <rect x="53" y="40" width="28" height="20" rx="2.5" :fill="accentSoft" :stroke="ink" stroke-width="1.1" />
+      <path d="M38 40 L46 30" :stroke="ink" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M43 27.6 L49.2 32.2" :stroke="ink" stroke-width="2.8" stroke-linecap="round" />
+      <path d="M72 40 L80 30" :stroke="ink" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M77 27.6 L83.2 32.2" :stroke="ink" stroke-width="2.8" stroke-linecap="round" />
+      <circle cx="68" cy="73" r="5" fill="none" :stroke="ink" stroke-width="1.3" />
+      <line x1="68" y1="73" x2="68" y2="69" :stroke="acc" stroke-width="1.7" stroke-linecap="round" />
+      <circle cx="28" cy="73" r="2.5" :fill="acc" />
+    </g>
+    <g v-else-if="kind === 'dishwasher'">
+      <rect x="18" y="12" width="64" height="76" rx="6" fill="#fff" :stroke="ink" stroke-width="1.6" />
+      <rect x="18" y="12" width="64" height="12" rx="6" :fill="surfaceMuted" />
+      <circle cx="27" cy="18" r="2" :fill="ink" />
+      <circle cx="35" cy="18" r="2" :fill="ink" />
+      <rect x="64" y="15" width="12" height="5" rx="1.5" :fill="acc" />
+      <rect x="26" y="30" width="48" height="46" rx="5" :fill="accentSoft" :stroke="ink" stroke-width="1.2" />
+      <ellipse cx="36" cy="50" rx="3" ry="11" fill="#fff" :stroke="ink" stroke-width="1" />
+      <ellipse cx="45" cy="50" rx="3" ry="11" fill="#fff" :stroke="ink" stroke-width="1" />
+      <ellipse cx="54" cy="50" rx="3" ry="11" fill="#fff" :stroke="ink" stroke-width="1" />
+      <rect x="61" y="44" width="9" height="17" rx="2" fill="#fff" :stroke="ink" stroke-width="1" />
+      <line x1="30" y1="64" x2="70" y2="64" :stroke="ink" stroke-width="1.1" />
+      <line x1="34" y1="64" x2="34" y2="70" :stroke="ink" stroke-width="0.9" />
+      <line x1="50" y1="64" x2="50" y2="70" :stroke="ink" stroke-width="0.9" />
+      <line x1="66" y1="64" x2="66" y2="70" :stroke="ink" stroke-width="0.9" />
+    </g>
   </svg>
 </template>

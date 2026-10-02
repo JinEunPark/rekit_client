@@ -82,8 +82,11 @@ function notifyAuthExpired() {
 }
 
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  // FormData 는 그대로 넘긴다 — Content-Type 을 직접 지정하면 multipart boundary 가
+  // 빠져서 서버가 파싱하지 못하므로, 그 경우에만 브라우저가 헤더를 만들도록 둔다.
+  const isFormData = opts.body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (opts.body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (opts.auth) {
     const token = getAccessToken()
     if (token) headers.Authorization = `Bearer ${token}`
@@ -95,7 +98,12 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
       method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
       headers,
       credentials: 'include',
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body:
+        opts.body === undefined
+          ? undefined
+          : isFormData
+            ? (opts.body as FormData)
+            : JSON.stringify(opts.body),
     })
   } catch (err) {
     throw new ApiError(0, null, err instanceof Error ? err.message : '네트워크 오류')

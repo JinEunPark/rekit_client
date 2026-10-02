@@ -76,6 +76,7 @@ export interface CategoryMetaItem {
   id: BackendCategory
   label: string
   icon: string
+  image_url: string | null
   sort_order: number
 }
 

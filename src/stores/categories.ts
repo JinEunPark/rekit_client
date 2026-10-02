@@ -7,6 +7,7 @@ export interface AppCategory {
   label: string
   /** Backend 가 내려주는 아이콘 키 ("fridge", "vacuum", "menu" 등). */
   icon: string
+  imageUrl: string | null
   sortOrder: number
   /** URL/라우팅용 lowercase id. */
   slug: string
@@ -17,6 +18,7 @@ export interface NavAllEntry {
   id: 'ALL'
   label: '전체'
   icon: 'grid'
+  imageUrl: null
   sortOrder: number
   slug: 'all'
 }
@@ -27,6 +29,7 @@ const ALL_NAV: NavAllEntry = {
   id: 'ALL',
   label: '전체',
   icon: 'grid',
+  imageUrl: null,
   sortOrder: Number.POSITIVE_INFINITY,
   slug: 'all',
 }
@@ -36,6 +39,7 @@ function toAppCategory(c: CategoryMetaItem): AppCategory {
     id: c.id,
     label: c.label,
     icon: c.icon,
+    imageUrl: c.image_url,
     sortOrder: c.sort_order,
     slug: c.id.toLowerCase(),
   }

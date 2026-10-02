@@ -1455,13 +1455,17 @@ PATCH /admin/products/{product_id}/images/{image_id}
 
 ## 14. Uploads — 파일 업로드 (Presigned URL)
 
-이미지 업로드는 **백엔드를 경유하지 않는 presigned URL 방식**이다. 파일 바이트를 백엔드로 직접 전송하는 엔드포인트는 없음.
+래스터 이미지는 **백엔드를 경유하지 않는 presigned URL 방식**, SVG 는 **서버 경유 방식**(§14.3)이다.
 
-**흐름**
+**세 엔드포인트 모두 관리자 전용** (`Authorization: Bearer <admin accessToken>`). 비로그인/일반회원은 401·403.
+
+**흐름 (래스터 — JPG/PNG/WEBP)**
 1. `POST /uploads/presign` 으로 업로드 URL 발급
 2. 클라이언트가 응답의 `upload_url`에 파일 바이트를 **직접 PUT** (스토리지로 바로 전송 — 백엔드 미경유, `Authorization` 헤더를 붙이면 안 되고 응답의 `headers`만 그대로 포함)
 3. `POST /uploads/confirm` 으로 업로드 완료 처리 → 최종 `public_url` 획득
 4. 그 `public_url`을 13.2의 `image_urls` 또는 13.6/13.7의 `url` 값으로 사용
+
+**흐름 (SVG — 카테고리 이미지 전용)**: `POST /uploads/svg` 한 번으로 끝. presign/confirm 을 쓰지 않는다 (이유는 §14.3).
 
 ### 14.1 업로드 URL 발급
 
@@ -1473,10 +1477,14 @@ POST /uploads/presign
 ```json
 { "content_type": "image/jpeg", "purpose": "product_image" }
 ```
+**Auth**: 관리자
+
 | 필드 | 타입 | 비고 |
 |---|---|---|
-| `content_type` | enum | `image/jpeg` \| `image/png` \| `image/webp`, 필수 |
-| `purpose` | const | `"product_image"` 고정 (기본값이라 생략 가능) |
+| `content_type` | enum | `image/jpeg` \| `image/png` \| `image/webp`, 필수. **SVG 는 여기서 받지 않는다** (422) — §14.3 사용 |
+| `purpose` | enum | `"product_image"`(기본값, 생략 가능) \| `"category_image"` |
+
+`purpose` 에 따라 키 prefix 가 갈린다 — `product_image` → `products/{uuid}.{ext}`, `category_image` → `categories/{uuid}.{ext}`.
 
 **Response 200**
 ```json
@@ -1513,6 +1521,36 @@ POST /uploads/confirm
 ```
 
 confirm 응답의 `public_url`/`size`/`content_type`은 실제 업로드된 파일 기준으로 서버가 검증한 값이다 — presign 응답 값과 다를 수 있으므로 confirm 응답을 최종 값으로 신뢰할 것.
+
+### 14.3 SVG 업로드 (카테고리 이미지 전용)
+
+```
+POST /uploads/svg
+```
+
+**Auth**: 관리자 · **Content-Type**: `multipart/form-data` · **필드**: `file`
+
+**왜 presign 을 안 쓰나** — presign 은 브라우저가 스토리지로 직접 PUT 하는 구조라 서버가 본문을 가로챌 지점이 없다. 객체는 PUT 직후부터 `public_url` 로 공개되므로, 클라이언트가 confirm 을 호출하지 않으면 검사가 **아예 실행되지 않은 채** 악성 SVG 가 호스팅된다. 그래서 SVG 만 본문을 서버로 받아, **검사를 통과한 바이트만 스토리지에 올린다.**
+
+**검사 (fail-closed — 위험 요소가 하나라도 있으면 통째로 거부)**
+- 태그: `<script>` `<foreignObject>` `<iframe>` `<embed>` `<object>` `<use>`, SMIL(`<animate>` `<set>` `<animateTransform>` `<animateMotion>` `<handler>`)
+- 속성: `on*` 이벤트 핸들러, `href`/`src` 의 `javascript:` · `data:text/html` (공백·제어문자를 제거한 뒤 비교 — `java&#10;script:` 우회 차단)
+- XML 파싱 실패, 루트 태그가 `<svg>` 가 아닌 경우
+- 크기 초과는 413 `FILE_TOO_LARGE`
+
+위반 시 **422 `SVG_UNSAFE_CONTENT`**, 파일은 저장되지 않는다.
+
+**Response 200** — `confirm` 과 동일한 형태
+```json
+{
+  "key": "categories/0f2b….svg",
+  "public_url": "https://rekit.co.kr/s3/rekle-images/categories/0f2b….svg",
+  "size": 1024,
+  "content_type": "image/svg+xml"
+}
+```
+
+> ⚠️ **남은 항목 (인프라)** — 스토리지가 앱과 **동일 오리진**(`rekit.co.kr/s3/…`)에서 서빙된다. 지금은 관리자만 업로드할 수 있고 SVG 는 저장 전 검사를 거치지만, 심층방어 차원에서 스토리지 도메인 분리 또는 `Content-Disposition`/CSP 검토가 남아있다 (`todo.md` 참고).
 
 ---
 

@@ -147,6 +147,12 @@
     - [ ] 네이버 서치어드바이저 → 웹페이지 수집 요청 (홈 + /products)
     - [ ] 카카오톡/슬랙에 https://rekit.co.kr 링크 붙여넣어 미리보기 제목·설명·이미지(og-cover) 정상인지
 - [ ] CI: type-check + build 자동화
+- ✅ 카테고리 이미지 + SVG 아이콘 업로드 — 계약은 `docs/api.md` §14. 업로드 보안 이슈는 아래에서 함께 정리
+- ✅ **업로드 보안 (2026-10-02)** — SVG 허용 시 발견된 구멍 수정
+  - ✅ `/uploads/presign`·`/uploads/confirm`·`/uploads/svg` 전부 관리자 가드(`Depends(get_admin_user)`) 적용. 이전엔 무인증이라 누구나 스토리지에 업로드 가능했음
+  - ✅ presign 에서 SVG 제거 → `POST /uploads/svg` 서버 경유 업로드 신설. presign 은 브라우저가 스토리지로 직접 PUT 하는 구조라, confirm 을 생략하면 검사가 실행되지 않은 채 공개됐음 (재현 확인). 이제 검사를 통과한 바이트만 저장됨
+  - ✅ `is_svg_safe` 우회 보완 — SMIL(`<animate>`/`<set>`/`<animateTransform>`/`<animateMotion>`) 태그 차단, URL 스킴의 공백·제어문자 정규화 후 비교(`java&#10;script:` 차단)
+  - [ ] 스토리지가 앱과 동일 오리진(`rekit.co.kr/s3/…`) — 별도 도메인 분리 또는 `Content-Disposition`/CSP 검토 (인프라 작업, 심층방어용)
 
 ---
 

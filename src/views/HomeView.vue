@@ -9,7 +9,7 @@ import { useHomeViewModel } from './HomeViewModel'
 import { useCategoryStore } from '@/stores/categories'
 import { usePageSeo } from '@/composables/usePageSeo'
 import type { ApplianceKind } from '@/data/products'
-import type { IconName } from '@/design/icons'
+import { ICON_PATHS, type IconName } from '@/design/icons'
 
 usePageSeo({
   title: '업소용 중고가전 직거래 - 폐업 매장 영업용 가전 마켓 | rekit',
@@ -24,6 +24,8 @@ const APPLIANCE_KINDS = new Set<ApplianceKind>([
   'aircon',
   'microwave',
   'vacuum',
+  'fryer',
+  'dishwasher',
 ])
 
 const vm = useHomeViewModel()
@@ -31,6 +33,9 @@ const categoryStore = useCategoryStore()
 
 function applianceKind(icon: string): ApplianceKind | null {
   return APPLIANCE_KINDS.has(icon as ApplianceKind) ? (icon as ApplianceKind) : null
+}
+function iconName(icon: string): IconName | null {
+  return icon in ICON_PATHS ? (icon as IconName) : null
 }
 
 onMounted(() => void vm.load())
@@ -61,8 +66,10 @@ onMounted(() => void vm.load())
           class="cats__item"
         >
           <div class="cats__icon">
-            <ApplianceGlyph v-if="applianceKind(c.icon)" :kind="applianceKind(c.icon)!" />
-            <IconBase v-else :name="(c.icon as IconName)" :size="22" />
+            <img v-if="c.imageUrl" :src="c.imageUrl" :alt="c.label" class="cats__icon-img" />
+            <ApplianceGlyph v-else-if="applianceKind(c.icon)" :kind="applianceKind(c.icon)!" />
+            <IconBase v-else-if="iconName(c.icon)" :name="iconName(c.icon)!" :size="22" />
+            <span v-else class="cats__icon-fallback">{{ c.icon }}</span>
           </div>
           <span>{{ c.label }}</span>
         </RouterLink>
@@ -196,6 +203,18 @@ onMounted(() => void vm.load())
 .cats__icon > svg {
   width: 100%;
   height: 100%;
+}
+
+.cats__icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.cats__icon-fallback {
+  font-size: 22px;
+  line-height: 1;
 }
 
 @media (min-width: 768px) {

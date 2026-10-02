@@ -4,6 +4,7 @@ export interface AdminCategoryResponse {
   id: string
   title: string
   icon: string
+  image_url: string | null
   sort_order: number
 }
 
@@ -11,13 +12,17 @@ export interface AdminCategoryCreate {
   id: string
   title: string
   icon: string
+  image_url?: string | null
   sort_order?: number
 }
 
+// 서버는 title/icon/sort_order 에 명시적 null 을 거부한다 (NOT NULL 컬럼) — 생략하면 기존 값 유지.
+// image_url 만 null 을 보내 이미지를 제거할 수 있다.
 export interface AdminCategoryUpdate {
-  title?: string | null
-  icon?: string | null
-  sort_order?: number | null
+  title?: string
+  icon?: string
+  image_url?: string | null
+  sort_order?: number
 }
 
 export function listAdminCategories(): Promise<AdminCategoryResponse[]> {

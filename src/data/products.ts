@@ -1,4 +1,4 @@
-export type ApplianceKind = 'fridge' | 'washer' | 'tv' | 'aircon' | 'microwave' | 'vacuum'
+export type ApplianceKind = 'fridge' | 'washer' | 'tv' | 'aircon' | 'microwave' | 'vacuum' | 'fryer' | 'dishwasher'
 export type Tone = 'mint' | 'sage' | 'sand' | 'stone' | 'cool' | 'cream'
 export type Grade = 'A' | 'B' | 'C'
 

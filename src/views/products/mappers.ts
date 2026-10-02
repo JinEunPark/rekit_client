@@ -12,6 +12,8 @@ const APPLIANCE_KINDS = new Set<ApplianceKind>([
   'aircon',
   'microwave',
   'vacuum',
+  'fryer',
+  'dishwasher',
 ])
 
 /** 백엔드 icon 값이 ApplianceKind 인 경우만 그대로 사용, 아니면 microwave 폴백. */
