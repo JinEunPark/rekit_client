@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import IconBase from '@/components/ds/IconBase.vue'
 import Button from '@/components/ds/Button.vue'
+import { useOrderStore } from '@/stores/orders'
 
 /**
  * 토스 결제 위젯 failUrl 이 가리키는 프론트 페이지.
  * 결제창에서 취소하거나 인증에 실패하면 ?code=&message=&orderId= 로 돌아옵니다.
  * 이 단계는 승인 전이라 금액이 청구되지 않았습니다.
+ *
+ * 돌아온 주문은 재고를 잡은 PENDING 상태라 바로 취소해 재고를 돌려놓는다
+ * (다른 구매자가 30분 동안 못 사는 문제 방지). 실패해도 화면엔 영향 없음.
  */
 
 const route = useRoute()
 const router = useRouter()
+const orders = useOrderStore()
 
 function q(name: string): string {
   const v = route.query[name]
@@ -25,6 +30,15 @@ const reason = computed(() => {
   if (code.value === 'PAY_PROCESS_CANCELED') return '결제를 취소하셨어요.'
   if (code.value === 'PAY_PROCESS_ABORTED') return '결제가 중단됐어요.'
   return '결제가 완료되지 않았어요.'
+})
+
+onMounted(async () => {
+  const orderNumber = q('orderId')
+  if (!orderNumber) return
+  // 결제 완료된 주문에 이 페이지를 다시 열면(뒤로가기 등) 취소=환불이 되므로 PENDING 일 때만
+  const order = await orders.fetchOrder(orderNumber)
+  if (order?.status !== 'PENDING') return
+  orders.cancel(orderNumber).catch(() => {})
 })
 </script>
 

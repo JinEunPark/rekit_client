@@ -30,6 +30,35 @@ function q(name: string): string {
   return typeof v === 'string' ? v : ''
 }
 
+// 승인 결과를 모르는 오류(네트워크 끊김·PG 응답 불명). confirm 은 멱등이라 다시 불러도 안전하다.
+const UNCERTAIN_STATUSES = new Set([0, 502, 503, 504])
+const RETRY_DELAYS_MS = [1500, 3000, 5000]
+const CHECKING_MESSAGE =
+  '결제 결과를 확인하고 있어요. 잠시 후 주문내역에서 결제 상태를 확인해 주세요.'
+
+function isUncertain(err: unknown): boolean {
+  return err instanceof ApiError && UNCERTAIN_STATUSES.has(err.status)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function goComplete(orderNo: string): Promise<void> {
+  // 결제 완료된 주문의 상품을 장바구니에서 비우고 주문 상태 최신화
+  const order = await orders.fetchOrder(orderNo)
+  order?.items.forEach((i) => cart.remove(String(i.productId)))
+  router.replace(`/checkout/complete?order=${encodeURIComponent(orderNo)}`)
+}
+
+function failMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 404) {
+    return '주문 정보를 찾을 수 없어요. 결제가 완료되지 않았습니다.'
+  }
+  if (err instanceof ApiError) return err.message || '결제 승인에 실패했어요.'
+  return '결제 승인 중 오류가 발생했어요.'
+}
+
 onBeforeMount(async () => {
   const paymentKey = q('paymentKey')
   orderNumber.value = q('orderId')
@@ -40,33 +69,38 @@ onBeforeMount(async () => {
     return
   }
 
-  try {
-    const result = await confirmPayment({
-      payment_key: paymentKey,
-      order_id: orderNumber.value,
-      amount,
-    })
-    savePaymentResult(result)
-
-    // 결제 완료된 주문의 상품을 장바구니에서 비우고 주문 상태 최신화
-    const order = await orders.fetchOrder(result.order_number)
-    order?.items.forEach((i) => cart.remove(String(i.productId)))
-
-    router.replace(`/checkout/complete?order=${encodeURIComponent(result.order_number)}`)
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 502) {
-      phase.value = 'checking'
-      message.value =
-        '결제 결과를 확인하고 있어요. 잠시 후 주문내역에서 결제 상태를 확인해 주세요.'
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const result = await confirmPayment({
+        payment_key: paymentKey,
+        order_id: orderNumber.value,
+        amount,
+      })
+      savePaymentResult(result)
+      await goComplete(result.order_number)
       return
-    }
-    phase.value = 'failed'
-    if (err instanceof ApiError && err.status === 404) {
-      message.value = '주문 정보를 찾을 수 없어요. 결제가 완료되지 않았습니다.'
-    } else if (err instanceof ApiError) {
-      message.value = err.message || '결제 승인에 실패했어요.'
-    } else {
-      message.value = '결제 승인 중 오류가 발생했어요.'
+    } catch (err) {
+      const delay = RETRY_DELAYS_MS[attempt]
+      if (isUncertain(err) && delay !== undefined) {
+        phase.value = 'checking'
+        message.value = CHECKING_MESSAGE
+        await sleep(delay)
+        continue
+      }
+      // 웹훅이 먼저 결제를 확정했을 수 있다 — 실패로 단정하기 전에 주문 상태로 최종 판단
+      const order = await orders.fetchOrder(orderNumber.value)
+      if (order && order.status !== 'PENDING' && order.status !== 'CANCELLED') {
+        await goComplete(orderNumber.value)
+        return
+      }
+      if (isUncertain(err)) {
+        phase.value = 'checking'
+        message.value = CHECKING_MESSAGE
+        return
+      }
+      phase.value = 'failed'
+      message.value = failMessage(err)
+      return
     }
   }
 })

@@ -189,6 +189,8 @@ async function pay() {
 
   paying.value = true
   payError.value = ''
+  // 결제창을 띄우기 전에 실패하면 이 주문이 재고를 잡은 채 남으므로 바로 취소한다
+  let createdOrderNumber: string | null = null
 
   try {
     const addressId = toNumId(selectedAddrId.value!)!
@@ -208,6 +210,7 @@ async function pay() {
       shipping_method: shippingMethod,
       memo: selectedAddr.value?.memo || null,
     })
+    createdOrderNumber = order.orderNumber
 
     // 2) 결제 레코드 생성 → 백엔드가 계산한 확정 금액 확보
     const method = await selectedPaymentMethod()
@@ -227,6 +230,10 @@ async function pay() {
     })
   } catch (err) {
     console.error('[pay]', err)
+    if (createdOrderNumber) {
+      // 실패해도 화면엔 영향 없음 — 남은 주문은 재주문 시·스케줄러가 백엔드에서 정리한다
+      orders.cancel(createdOrderNumber).catch(() => {})
+    }
     if (err instanceof ApiError) {
       payError.value = err.message || `오류가 발생했어요. (${err.status})`
     } else if (err && typeof err === 'object' && 'message' in err) {
