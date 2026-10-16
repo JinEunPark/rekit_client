@@ -147,6 +147,7 @@ function checkout() {
             <ProductTile
               :kind="line.product!.kind"
               :tone="line.product!.tone"
+              :image-url="line.product!.thumbnailUrl"
               ratio="1/1"
               radius="10px"
               :show-label="false"

@@ -327,6 +327,7 @@ function phoneDigits(phone?: string | null): string | undefined {
               <ProductTile
                 :kind="s.product!.kind"
                 :tone="s.product!.tone"
+                :image-url="s.product!.thumbnailUrl"
                 ratio="1/1"
                 radius="10px"
                 :show-label="false"

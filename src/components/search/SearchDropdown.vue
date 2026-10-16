@@ -180,6 +180,7 @@ onUnmounted(() => {
                     <ProductTile
                       :kind="r.kind"
                       :tone="r.tone"
+                      :image-url="r.thumbnailUrl"
                       ratio="1/1"
                       radius="8px"
                       :show-label="false"

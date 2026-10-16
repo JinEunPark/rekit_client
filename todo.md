@@ -37,6 +37,7 @@
 - ✅ **카탈로그**: `/` (홈), `/products` (목록·필터·정렬·URL 동기화), `/products/:id` (상세)
 - ✅ **검색**: `/search` (모바일 전용) + `SearchDropdown` (데스크탑)
 - ✅ **장바구니**: `/cart` — 수량 조절, 개별/선택/전체 삭제, 배지 카운트
+  - ✅ 상품 썸네일 미표시 수정 — `ProductTile`에 `image-url`을 안 넘겨 항상 아이콘 placeholder만 보이던 문제. 장바구니·주문서(`OrderView`)·검색 드롭다운(`SearchDropdown`) 세 곳에 `thumbnailUrl` 전달 추가
 - ✅ **체크아웃**: `/checkout/identity` → `/checkout/order` → (토스 결제창) → `/checkout/payment`(승인) 또는 `/checkout/payment/fail`(취소·실패) → `/checkout/complete`
 - ✅ **마이페이지 7개**: `/my`, `/my/orders`, `/my/orders/:id`, `/my/wishlist`, `/my/addresses`, `/my/profile`, `/my/contacts`(+`:id`) — 내 문의내역 신규
 - ✅ **정적 7개**: `/guide`, `/about`, `/help/faq`, `/help/contact`, `/help/notice`, `/legal/terms`, `/legal/privacy`
