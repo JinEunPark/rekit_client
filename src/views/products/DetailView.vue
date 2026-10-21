@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { won } from '@/design/tokens'
 import { discountPct, isSoldOut, type Tone } from '@/data/products'
+import { DELIVERY_OPTIONS, deliveryPeriodText } from '@/data/delivery'
 import IconBase from '@/components/ds/IconBase.vue'
 import Badge from '@/components/ds/Badge.vue'
 import Button from '@/components/ds/Button.vue'
@@ -445,22 +446,14 @@ const gradeShort = computed(() => {
       <section class="block">
         <h2 class="block__title">배송 정보</h2>
         <ul class="delivery">
-          <li class="delivery__row">
+          <li v-for="o in DELIVERY_OPTIONS" :key="o.key" class="delivery__row">
             <div class="delivery__icon">
-              <IconBase name="truck" :size="20" />
+              <IconBase :name="o.key === 'cargo' ? 'truck' : 'map'" :size="20" />
             </div>
             <div>
-              <div class="delivery__t">화물택배</div>
-              <p class="delivery__b">대형 가전 · 도착까지 약 2~4일 · 배송비 60,000원</p>
-            </div>
-          </li>
-          <li class="delivery__row">
-            <div class="delivery__icon">
-              <IconBase name="map" :size="20" />
-            </div>
-            <div>
-              <div class="delivery__t">직접 배송 (서울/경기)</div>
-              <p class="delivery__b">전문 기사가 운반·설치까지 · 1~2일 · 배송비 40,000원</p>
+              <div class="delivery__t">{{ o.name }}</div>
+              <p class="delivery__b">{{ o.scope }} · 배송비 {{ won(o.fee) }}</p>
+              <p class="delivery__b"><b>배송기간</b> {{ deliveryPeriodText(o) }}</p>
             </div>
           </li>
         </ul>

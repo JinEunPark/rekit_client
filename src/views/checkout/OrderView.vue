@@ -13,6 +13,7 @@ import { useProductStore } from '@/stores/products'
 import type { Product } from '@/data/products'
 import { useOrderStore } from '@/stores/orders'
 import type { ShipmentMethod } from '@/api/orders'
+import { DELIVERY_OPTIONS, deliveryPeriodText, type DeliveryMethod } from '@/data/delivery'
 import { toNumId } from '@/stores/utils'
 import { useAddressStore } from '@/stores/addresses'
 import { ApiError } from '@/api/client'
@@ -23,8 +24,6 @@ import {
   TOSS_AGREEMENT_VARIANT,
   tossCustomerKey,
 } from '@/config/payments'
-
-type DeliveryMethod = 'direct' | 'cargo'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -81,10 +80,7 @@ const selectedAddr = computed(() =>
 /* ────────────── Delivery ────────────── */
 
 const deliveryMethod = ref<DeliveryMethod>('direct')
-const deliveryOptions: { key: DeliveryMethod; t: string; s: string; fee: number }[] = [
-  { key: 'direct', t: '직접 배송', s: '서울/경기 · 시간 협의 · 1~2일', fee: 40_000 },
-  { key: 'cargo', t: '화물택배', s: '대형 가전 · 2~4일', fee: 60_000 },
-]
+const deliveryOptions = DELIVERY_OPTIONS
 const shippingFee = computed(
   () => deliveryOptions.find((o) => o.key === deliveryMethod.value)?.fee ?? 0,
 )
@@ -367,8 +363,9 @@ function phoneDigits(phone?: string | null): string | undefined {
               <span v-if="deliveryMethod === o.key" class="opt__dot" />
             </span>
             <div class="opt__body">
-              <div class="opt__t">{{ o.t }}</div>
-              <div class="opt__s">{{ o.s }}</div>
+              <div class="opt__t">{{ o.name }}</div>
+              <div class="opt__s">{{ o.scope }}</div>
+              <div class="opt__s">{{ deliveryPeriodText(o) }}</div>
             </div>
             <div class="opt__fee">{{ won(o.fee) }}</div>
           </label>
