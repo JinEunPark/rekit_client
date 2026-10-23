@@ -40,6 +40,7 @@
   - ✅ 상품 썸네일 미표시 수정 — `ProductTile`에 `image-url`을 안 넘겨 항상 아이콘 placeholder만 보이던 문제. 장바구니·주문서(`OrderView`)·검색 드롭다운(`SearchDropdown`) 세 곳에 `thumbnailUrl` 전달 추가
 - ✅ **체크아웃**: `/checkout/identity` → `/checkout/order` → (토스 결제창) → `/checkout/payment`(승인) 또는 `/checkout/payment/fail`(취소·실패) → `/checkout/complete`
 - ✅ **마이페이지 7개**: `/my`, `/my/orders`, `/my/orders/:id`, `/my/wishlist`, `/my/addresses`, `/my/profile`, `/my/contacts`(+`:id`) — 내 문의내역 신규
+- ✅ **푸터 '판매자 등록' 링크 제거** (2026-10-23) — `/sell` 미구현 상태라 푸터 서비스 메뉴에서 삭제
 - ✅ **정적 7개**: `/guide`, `/about`, `/help/faq`, `/help/contact`, `/help/notice`, `/legal/terms`, `/legal/privacy`
 - ✅ **Help 상세**: `/help/notice/:id` (공지사항 상세) 신규 추가
 - ✅ **문의하기 로그인 필수 전환**: `/help/contact`가 비로그인 시 폼 대신 로그인 유도 화면 표시, 제출 성공 시 `/my/contacts`로 안내

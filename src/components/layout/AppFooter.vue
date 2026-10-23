@@ -25,7 +25,6 @@ const BUSINESS_INFO = [
         <div class="ft__group">
           <div class="ft__title">서비스</div>
           <RouterLink to="/products">상품 둘러보기</RouterLink>
-          <RouterLink to="/sell">판매자 등록</RouterLink>
           <RouterLink to="/guide">이용 안내</RouterLink>
         </div>
         <div class="ft__group">
