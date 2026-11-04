@@ -15,23 +15,37 @@ pipeline {
 
     environment {
         COMPOSE_PROJECT = 'rekit-client'
+        // 배포 태그 시점의 compose 를 꺼내 둘 파일. 워크스페이스는 master 라서 그 compose 를 그대로 쓰면
+        // 이미지(태그)와 compose(master)가 어긋나, compose 가 바뀐 뒤 이전 태그로 롤백하면 깨질 수 있다
+        // (백엔드 deploy-was 에서 실제로 발생한 문제 — 같은 방식으로 맞춘다).
+        DEPLOY_COMPOSE  = '.deploy-compose.yml'
     }
 
     stages {
         stage('Deploy') {
             steps {
                 script {
-                    if (!params.VERSION?.trim()) {
-                        error 'VERSION 이 비었습니다. 먼저 build-client 잡으로 해당 태그 이미지를 빌드했는지 확인하세요.'
+                    if (!params.VERSION?.trim()?.matches(/^\d+\.\d+\.\d+$/)) {
+                        error "VERSION 형식 오류: '${params.VERSION}' (X.Y.Z 여야 함). 먼저 build-client 잡으로 해당 태그 이미지를 빌드했는지 확인하세요."
                     }
+                    env.DEPLOY_TAG = params.VERSION.trim()
                 }
-                echo "Deploying 127.0.0.1:5000/rekit-client:${params.VERSION}"
+                echo "Deploying 127.0.0.1:5000/rekit-client:${env.DEPLOY_TAG} (compose 도 태그 ${env.DEPLOY_TAG} 기준)"
+                sh 'git fetch --tags --force --prune'
+                // git show 로 별도 파일에 꺼낸다 — checkout 으로 워크스페이스의 추적 파일을 바꾸지 않기 위해
+                sh "git show tags/${env.DEPLOY_TAG}:docker-compose.prod.yml > ${DEPLOY_COMPOSE}"
                 sh """
-                    IMAGE_TAG=${params.VERSION} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml pull web
-                    IMAGE_TAG=${params.VERSION} docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml up -d web
+                    IMAGE_TAG=${env.DEPLOY_TAG} docker compose -p ${COMPOSE_PROJECT} -f ${DEPLOY_COMPOSE} pull web
+                    IMAGE_TAG=${env.DEPLOY_TAG} docker compose -p ${COMPOSE_PROJECT} -f ${DEPLOY_COMPOSE} up -d web
                     docker image prune -f
                 """
             }
+        }
+    }
+
+    post {
+        always {
+            sh "rm -f ${DEPLOY_COMPOSE}"
         }
     }
 }
