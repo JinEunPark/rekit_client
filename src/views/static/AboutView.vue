@@ -3,9 +3,9 @@ import StaticPage from '@/components/layout/StaticPage.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 
 usePageSeo({
-  title: 'rekit 소개',
+  title: '리키트(rekit) 소개',
   description:
-    'rekit은 폐업 매장의 가전이 폐기되기 전에 검수·재유통해 자원 순환을 돕는 직거래 플랫폼입니다. 지금까지 재거래된 가전과 절감한 폐기 무게를 확인하세요.',
+    '리키트(rekit)는 폐업 매장의 가전이 폐기되기 전에 검수·재유통해 자원 순환을 돕는 직거래 플랫폼입니다. 지금까지 재거래된 가전과 절감한 폐기 무게를 확인하세요.',
 })
 
 const stats = [
@@ -19,7 +19,7 @@ const stats = [
   <StaticPage
     kicker="ABOUT REKIT"
     title="버려질 가전이&#10;다시 누군가의 집으로"
-    lead="rekit은 폐업 매장의 영업용 가전을 다시 살려내는 직거래 플랫폼입니다. 폐기될 가전이 누군가의 새로운 시작이 되도록, 검수와 직배송으로 안전한 거래를 만들어요."
+    lead="리키트(rekit)는 폐업 매장의 영업용 가전을 다시 살려내는 직거래 플랫폼입니다. 폐기될 가전이 누군가의 새로운 시작이 되도록, 검수와 직배송으로 안전한 거래를 만들어요."
   >
     <h2>우리가 풀고 있는 문제</h2>
     <p>

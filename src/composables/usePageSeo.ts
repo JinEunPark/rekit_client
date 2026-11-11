@@ -4,8 +4,8 @@ import { useHead } from '@unhead/vue'
 
 /** 프로덕션 정식 도메인 (www 없음, https). canonical·OG URL 기준. */
 export const SITE_ORIGIN = 'https://rekit.co.kr'
-export const SITE_NAME = 'rekit'
-const TITLE_SUFFIX = ' · rekit'
+export const SITE_NAME = '리키트 rekit'
+const TITLE_SUFFIX = ' · 리키트 rekit'
 const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/og-cover.png`
 
 /** robots noindex 를 적용할 비공개 화면 경로 프리픽스. public/robots.txt 와 동기화. */
@@ -49,7 +49,7 @@ export function usePageSeo(input: PageSeoInput = {}) {
   const fullTitle = computed(() => {
     const t = toValue(input.title)
     if (!t) return `${SITE_NAME} · 업소용 중고가전 직거래 플랫폼`
-    return t.endsWith(SITE_NAME) ? t : `${t}${TITLE_SUFFIX}`
+    return t.endsWith('rekit') ? t : `${t}${TITLE_SUFFIX}`
   })
   const description = computed(() => toValue(input.description) ?? '')
   const canonical = computed(() => `${SITE_ORIGIN}${input.path ?? route.path}`)

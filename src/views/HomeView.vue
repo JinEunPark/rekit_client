@@ -12,9 +12,9 @@ import type { ApplianceKind } from '@/data/products'
 import { ICON_PATHS, type IconName } from '@/design/icons'
 
 usePageSeo({
-  title: '업소용 중고가전 직거래 - 폐업 매장 영업용 가전 마켓 | rekit',
+  title: '업소용 중고가전 직거래 - 폐업 매장 영업용 가전 마켓 | 리키트 rekit',
   description:
-    '폐업한 카페·식당·매장에서 나온 업소용 중고가전(냉장고·제빙기·에어컨·주방기기)을 전수 검수한 뒤 직거래하는 마켓 rekit. 영업용 가전을 새 제품 대비 평균 73% 할인가로.',
+    '폐업한 카페·식당·매장에서 나온 업소용 중고가전(냉장고·제빙기·에어컨·주방기기)을 전수 검수한 뒤 직거래하는 마켓 리키트(rekit). 영업용 가전을 새 제품 대비 평균 73% 할인가로.',
 })
 
 const APPLIANCE_KINDS = new Set<ApplianceKind>([
@@ -44,7 +44,7 @@ onMounted(() => void vm.load())
 <template>
   <div class="home">
     <h1 class="rekit-sr-only">
-      업소용 중고가전 직거래 마켓 rekit — 폐업 매장에서 나온 영업용 냉장고·제빙기·에어컨·주방기기를
+      업소용 중고가전 직거래 마켓 리키트(rekit) — 폐업 매장에서 나온 영업용 냉장고·제빙기·에어컨·주방기기를
       전수 검수 후 평균 73% 할인가로
     </h1>
 
