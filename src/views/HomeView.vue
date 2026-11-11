@@ -14,7 +14,7 @@ import { ICON_PATHS, type IconName } from '@/design/icons'
 usePageSeo({
   title: '업소용 중고가전 직거래 - 폐업 매장 가전 | 리키트 rekit',
   description:
-    '폐업 카페·식당에서 나온 업소용 냉장고·제빙기·에어컨을 전수 검수해 평균 73% 할인가로 직거래하는 리키트(rekit).',
+    '폐업 카페·식당에서 나온 업소용 중고가전(냉장고·제빙기·에어컨)을 전수 검수해 평균 73% 할인가로 직거래하는 리키트(rekit).',
 })
 
 const APPLIANCE_KINDS = new Set<ApplianceKind>([

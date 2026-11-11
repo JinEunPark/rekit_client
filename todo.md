@@ -157,7 +157,7 @@
   - ✅ **2단계 프리렌더** — `scripts/prerender.mjs`(puppeteer)가 빌드된 SPA를 공개 라우트 9개에서 렌더해 `dist/<route>/index.html`+`dist/<route>.html` 생성. `build-only`에 연결. `SKIP_PRERENDER=1`로 우회. 라우트 목록은 `scripts/public-routes.mjs` 공유. vite-ssg 아님(vue-router 5 미지원) — 앱 코드 무수정 방식 채택
   - ✅ **키워드 정조준 (2026-09-04 세션)** — "업소용 중고가전" 계열 검색어 대응. 홈 `<title>`/`description` + sr-only `<h1>`(`.rekit-sr-only` 유틸 `main.css` 추가), `usePageSeo` 기본 타이틀, `index.html` 정적 메타 교체. `/products` 는 `CATEGORY_SEO` 맵으로 카테고리별 `<title>`·`description`·`<h1>` 분기(냉장고→"업소용 중고 냉장고" 등), canonical 은 `/products` 고정 유지. 상품 상세 `<title>` 에 "중고"·브랜드·`| rekit` 포함
   - ✅ **한글 브랜드명 검색 대응 (2026-11-11)** — "리키트"/"리킷트" 검색 시 미노출 원인: 메타·본문에 영문 "rekit"만 있고 한글명은 푸터 상호명에만 존재. 전 페이지 title 접미사 `· 리키트 rekit`, `og:site_name` "리키트 rekit", 홈 title/description/sr-only h1·소개 페이지에 "리키트(rekit)" 삽입, `index.html` 에 Organization/WebSite JSON-LD(`alternateName`: rekit·리킷트·리킷) 추가
-  - ✅ **네이버 진단 대응 (2026-11-11)** — 네이버 기준 제목 40자·설명 80자 이내로 홈·카테고리 9종·소개·개인정보처리방침·상품 상세 메타 단축 (홈 35자/67자). 소개 title 중복(`리키트(rekit) 소개 · 리키트 rekit`) 수정
+  - ✅ **네이버 진단 대응 (2026-11-11)** — 네이버 기준 제목 40자·설명 80자 이내로 홈·카테고리 9종·소개·개인정보처리방침·상품 상세 메타 단축 (홈 35자/73자, 설명에 "업소용 중고가전" 키워드 유지). 소개 title 중복(`리키트(rekit) 소개 · 리키트 rekit`) 수정
   - [ ] 네이버 진단의 "robots.txt 없음" 경고 — 응답은 정상(200·text/plain·Yeti UA 확인, http→https 308 1회는 가이드상 5회까지 허용이라 무관). 신규 등록이라 네이버가 robots.txt 를 아직 수집하지 않은 것으로 추정 → 서치어드바이저 **검증 → robots.txt → 수집 요청** 후 재진단
   - [ ] **네이버 서치어드바이저 사이트 등록** (미등록 상태) — ~~소유확인 메타태그 `index.html` 에 추가~~ ✅ (태그 `0.3.9`, Jenkins 빌드·배포 후 소유확인) → 배포 → 확인 → sitemap(`https://rekit.co.kr/sitemap.xml`)·RSS 제출 → 웹페이지 수집 요청(홈·/products·/about)
   - [ ] 배포 후 구글 서치콘솔 홈 URL 색인 재요청 (한글명 반영)
