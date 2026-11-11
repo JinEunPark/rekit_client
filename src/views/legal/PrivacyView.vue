@@ -5,7 +5,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 usePageSeo({
   title: '개인정보처리방침',
   description:
-    'rekit이 수집하는 개인정보 항목과 이용 목적, 보유 기간, 제3자 제공, 이용자의 권리 행사 방법을 안내합니다. 소셜 로그인 시 제공받는 정보 포함.',
+    '리키트(rekit)가 수집하는 개인정보 항목, 이용 목적, 보유 기간, 제3자 제공, 이용자 권리 행사 방법 안내.',
 })
 </script>
 
