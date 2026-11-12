@@ -32,6 +32,8 @@ export interface ProductResponse {
 export interface ProductImageResponse {
   id: number
   url: string
+  /** 480px 썸네일. 없으면(기존 이미지) null — url 로 폴백 */
+  thumb_url?: string | null
   sort_order: number
   label: string | null
 }

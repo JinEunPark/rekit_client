@@ -193,7 +193,10 @@
   - [ ] 백엔드 `AdminProductCreate`/`Update` 정수 필드에도 `le=` 상한 → API 직접 호출 시 500 대신 422
   - [ ] **기존 이미지 재압축** — 백엔드 `scripts/recompress_product_images.py` (dry-run 기본, `--apply` 시 `backup/originals/` 로 백업 후 같은 키 덮어쓰기, DB 무수정). 운영 실행 전 dry-run 결과 확인. 시뮬레이션: 12장 38.7MB → 3.0MB (-92.2%), Fast 4G 목록 로딩 18.2초 → 1.8초
   - [ ] 엣지 nginx `/s3/` 에 `Cache-Control` 추가 (현재 헤더 없음 → 브라우저 휴리스틱 캐시에 의존). 키가 UUID 라 재압축 이후엔 `public, max-age=31536000, immutable` 가능
-  - [ ] 카드 전용 썸네일(480px, ~20KB) 분리 — DB `thumb_url` 또는 imgproxy 도입 검토. 1600px 도 카드(≈200px)엔 여전히 과함
+  - ✅ **기존 이미지 재압축 운영 적용 (2026-11-13)** — 12장 38.7MB → 3.0MB (-92.2%), 키·이미지 ID 유지. 확인 후 `backup/originals/` 12개 삭제
+  - ✅ **카드 전용 썸네일 분리 (2026-11-13, 코드 완료 · 미배포)** — 업로드 시 1600px 본 이미지 + 480px WebP 썸네일(`makeThumbnail`, 원본에서 바로 생성)을 함께 올림(`uploadProductImage`). 백엔드 `product_images.thumb_url` 컬럼 + `thumbnail_url` 이 thumb 우선·url 폴백 (카드·장바구니·찜·주문 스냅샷). 상세 하단 썸네일 줄도 `thumb_url` 사용. 썸네일 실패 시 본 이미지 업로드는 성공 처리
+    - [ ] 배포 후 기존 12장 백필 — 백엔드 `scripts/generate_product_thumbnails.py` (psql `id|url` → 업로드 + `UPDATE` SQL)
+  - [ ] 이미지 편집기 5MB 제한이 **압축 전** 원본에 걸림 — 5MB 넘는 폰 원본은 압축 전에 거부됨 (`ProductImageEditor.vue` `MAX_SIZE`)
   - [ ] 운영 데이터: 상품마다 2번째 이미지가 1번째와 바이트 동일(같은 사진 2회 업로드) — 관리자 업로드 UX 확인
 
 ---

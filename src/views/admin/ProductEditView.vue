@@ -72,7 +72,7 @@ onMounted(async () => {
     visibility.value = p.status === 'ACTIVE' ? 'public' : 'private'
     images.value = [...p.images]
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((img) => ({ id: img.id, url: img.url, label: img.label }))
+      .map((img) => ({ id: img.id, url: img.url, thumb_url: img.thumb_url, label: img.label }))
   } catch (err) {
     loadError.value = err instanceof ApiError ? err.message : '상품 정보를 불러오지 못했습니다.'
   } finally {

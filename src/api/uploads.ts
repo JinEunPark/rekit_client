@@ -1,5 +1,5 @@
 import { apiRequest } from '@/api/client'
-import { compressImage } from '@/utils/compressImage'
+import { compressImage, makeThumbnail } from '@/utils/compressImage'
 
 export type UploadPurpose = 'product_image' | 'category_image'
 export type UploadContentType = 'image/jpeg' | 'image/png' | 'image/webp'
@@ -81,7 +81,30 @@ export async function uploadImage(file: File, purpose: UploadPurpose = 'product_
   }
   // 폰 원본(수 MB)을 그대로 서빙하지 않도록 업로드 직전에 리사이즈·재압축한다.
   const { file: upload } = await compressImage(file)
-  const presigned = await presignUpload(upload.type as UploadContentType, purpose)
-  await putToStorage(presigned, upload)
+  return uploadRaster(upload, purpose)
+}
+
+async function uploadRaster(file: File, purpose: UploadPurpose): Promise<ConfirmResponse> {
+  const presigned = await presignUpload(file.type as UploadContentType, purpose)
+  await putToStorage(presigned, file)
   return confirmUpload(presigned.key)
+}
+
+export interface ProductImageUpload {
+  url: string
+  /** 카드용 480px 썸네일. 만들기·올리기에 실패하면 null — 카드는 url 로 폴백한다 */
+  thumb_url: string | null
+}
+
+/** 상품 이미지 — 상세용(1600px)과 카드용 썸네일(480px)을 함께 올린다. */
+export async function uploadProductImage(file: File): Promise<ProductImageUpload> {
+  const main = await uploadImage(file, 'product_image')
+  let thumbUrl: string | null = null
+  try {
+    const thumb = await makeThumbnail(file)
+    if (thumb) thumbUrl = (await uploadRaster(thumb, 'product_image')).public_url
+  } catch {
+    // 썸네일은 부가 기능 — 실패해도 본 이미지 업로드는 성공으로 둔다
+  }
+  return { url: main.public_url, thumb_url: thumbUrl }
 }

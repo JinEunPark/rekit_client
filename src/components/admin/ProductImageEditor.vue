@@ -2,12 +2,13 @@
 import { computed, ref } from 'vue'
 import IconBase from '@/components/ds/IconBase.vue'
 import { replaceProductImages, updateProductImage } from '@/api/admin/products'
-import { uploadImage, UPLOAD_CONTENT_TYPES } from '@/api/uploads'
+import { uploadProductImage, UPLOAD_CONTENT_TYPES } from '@/api/uploads'
 import { ApiError } from '@/api/client'
 
 export interface EditableImage {
   id?: number
   url: string
+  thumb_url?: string | null
   label: string | null
 }
 
@@ -83,11 +84,11 @@ async function persist(next: EditableImage[]) {
   try {
     const updated = await replaceProductImages(
       props.productId,
-      next.map((img) => ({ url: img.url, label: img.label })),
+      next.map((img) => ({ url: img.url, thumb_url: img.thumb_url ?? null, label: img.label })),
     )
     const synced = [...updated.images]
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((img) => ({ id: img.id, url: img.url, label: img.label }))
+      .map((img) => ({ id: img.id, url: img.url, thumb_url: img.thumb_url, label: img.label }))
     emit('update:images', synced)
   } catch (err) {
     emit('error', err instanceof ApiError ? err.message : '이미지 저장 중 오류가 발생했습니다.')
@@ -116,8 +117,8 @@ async function onFilesPicked(e: Event) {
     }
     uploadingCount.value++
     try {
-      const { public_url } = await uploadImage(file)
-      next.push({ url: public_url, label: null })
+      const { url, thumb_url } = await uploadProductImage(file)
+      next.push({ url, thumb_url, label: null })
     } catch (err) {
       emit('error', err instanceof ApiError ? err.message : `${file.name} 업로드 중 오류가 발생했습니다.`)
     } finally {
@@ -182,7 +183,7 @@ async function commitLabel(index: number) {
         @dragend="onDragEnd"
       >
         <div class="pie__imgbox">
-          <img :src="img.url" :alt="img.label || `상품 이미지 ${i + 1}`" class="pie__img" />
+          <img :src="img.thumb_url || img.url" :alt="img.label || `상품 이미지 ${i + 1}`" class="pie__img" />
           <span v-if="i === 0" class="pie__primary">대표</span>
           <button
             type="button"

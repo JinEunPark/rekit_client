@@ -54,6 +54,8 @@ interface Thumb {
   l: string
   t: Tone
   url?: string
+  /** 아래 썸네일 줄(작은 버튼)용 — 480px 썸네일, 없으면 url */
+  thumbUrl?: string
   hasLabel: boolean
 }
 
@@ -64,6 +66,7 @@ const thumbs = computed<Thumb[]>(() => {
     l: img.label ?? `사진 ${i + 1}`,
     t: TONE_CYCLE[i % TONE_CYCLE.length] as Tone,
     url: img.url,
+    thumbUrl: img.thumb_url || img.url,
     hasLabel: !!img.label,
   }))
 })
@@ -301,7 +304,7 @@ const gradeShort = computed(() => {
             <ProductTile
               :kind="product.kind"
               :tone="th.t"
-              :image-url="th.url"
+              :image-url="th.thumbUrl"
               ratio="1/1"
               radius="10px"
               :show-label="false"

@@ -6,6 +6,7 @@ export type ProductStatus = 'ACTIVE' | 'SOLD_OUT' | 'INACTIVE'
 export interface AdminProductImageResponse {
   id: number
   url: string
+  thumb_url: string | null
   sort_order: number
   label: string | null
 }
@@ -103,7 +104,7 @@ export function deleteAdminProduct(id: number): Promise<void> {
 
 export function replaceProductImages(
   id: number,
-  images: { url: string; label?: string | null }[],
+  images: { url: string; thumb_url?: string | null; label?: string | null }[],
 ): Promise<AdminProductDetailResponse> {
   return apiRequest<AdminProductDetailResponse>(`/admin/products/${id}/images`, {
     method: 'PUT',
