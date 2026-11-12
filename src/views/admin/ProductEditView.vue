@@ -15,6 +15,10 @@ import {
   DAMAGE_OPTS as damageOpts,
   VISIBILITY_OPTS as visibilityOpts,
   parseNum,
+  sanitizeNumInput,
+  MAX_PRICE,
+  MAX_STOCK,
+  MAX_YEAR,
   calcDiscountPct,
 } from './productFormHelpers'
 import type { ConditionGrade } from './productFormHelpers'
@@ -155,7 +159,7 @@ async function handleSave() {
             </div>
             <div class="field">
               <label class="field__label">제조연도</label>
-              <input v-model="year" class="input" type="text" placeholder="예: 2022" />
+              <input :value="year" class="input" type="text" inputmode="numeric" @input="year = sanitizeNumInput($event, MAX_YEAR)" placeholder="예: 2022" />
             </div>
             <div class="field">
               <label class="field__label">용량 / 사이즈</label>
@@ -243,14 +247,14 @@ async function handleSave() {
             <div class="field">
               <label class="field__label">원가 (신품 정가)</label>
               <div class="input-suffix">
-                <input v-model="original" class="input" type="text" />
+                <input :value="original" class="input" type="text" inputmode="numeric" @input="original = sanitizeNumInput($event, MAX_PRICE, true)" />
                 <span class="input-suffix__s">원</span>
               </div>
             </div>
             <div class="field">
               <label class="field__label">판매가 <span class="req">*</span></label>
               <div class="input-suffix">
-                <input v-model="price" class="input input--filled" type="text" />
+                <input :value="price" class="input input--filled" type="text" inputmode="numeric" @input="price = sanitizeNumInput($event, MAX_PRICE, true)" />
                 <span class="input-suffix__s">원</span>
               </div>
             </div>
@@ -269,7 +273,7 @@ async function handleSave() {
           <div class="grid2">
             <div class="field">
               <label class="field__label">재고 수량 <span class="req">*</span></label>
-              <input v-model="stock" class="input input--filled" type="text" />
+              <input :value="stock" class="input input--filled" type="text" inputmode="numeric" @input="stock = sanitizeNumInput($event, MAX_STOCK)" />
             </div>
           </div>
         </section>

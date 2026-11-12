@@ -187,6 +187,10 @@
 - **상품 이미지 용량 최적화 (2026-11-13)** — 카드 썸네일이 폰 원본(4000×3000, 2.5~3.9MB)을 그대로 서빙 중이었음. 상품 6개 목록에 이미지 19.4MB, Fast 4G 기준 전부 뜨는 데 18.2초
   - ✅ 업로드 전 브라우저 리사이즈·재압축 — `src/utils/compressImage.ts` (긴 변 1600px, WebP q0.82, EXIF 회전 반영·메타데이터 제거, 300KB 이하·1600px 이하면 건너뜀). `uploadImage()` 에 연결. 실측(헤드리스 Chrome): 6장 19.37MB → 0.88MB (-95.5%), 장당 120~320ms
   - ✅ `ProductTile` 로딩 스켈레톤(shimmer) + 로드 완료 시 fade-in, `decoding="async"`, `prefers-reduced-motion` 대응
+  - ✅ 로컬 검증 (2026-11-13) — 헤드리스 Chrome 에서 presign→PUT→confirm 전 구간 `.webp` 저장·`image/webp` 서빙, Safari 관리자 화면 업로드도 `.webp` 로 저장 확인. 재압축 스크립트 dry-run·`--apply`·재실행 멱등·백업 로컬 확인
+- **관리자 상품 폼 숫자 입력 상한 (2026-11-13)** — 정가에 `100000000001` 입력 시 DB `INTEGER`(최대 약 21억) 초과로 상품 등록 500
+  - ✅ `productFormHelpers.sanitizeNumInput` — 숫자만 허용 + 상한 고정(정가·판매가 10억, 재고·제조연도 9,999), 가격은 입력 중 천 단위 쉼표, `inputmode="numeric"`. 등록·수정 화면 공통
+  - [ ] 백엔드 `AdminProductCreate`/`Update` 정수 필드에도 `le=` 상한 → API 직접 호출 시 500 대신 422
   - [ ] **기존 이미지 재압축** — 백엔드 `scripts/recompress_product_images.py` (dry-run 기본, `--apply` 시 `backup/originals/` 로 백업 후 같은 키 덮어쓰기, DB 무수정). 운영 실행 전 dry-run 결과 확인. 시뮬레이션: 12장 38.7MB → 3.0MB (-92.2%), Fast 4G 목록 로딩 18.2초 → 1.8초
   - [ ] 엣지 nginx `/s3/` 에 `Cache-Control` 추가 (현재 헤더 없음 → 브라우저 휴리스틱 캐시에 의존). 키가 UUID 라 재압축 이후엔 `public, max-age=31536000, immutable` 가능
   - [ ] 카드 전용 썸네일(480px, ~20KB) 분리 — DB `thumb_url` 또는 imgproxy 도입 검토. 1600px 도 카드(≈200px)엔 여전히 과함

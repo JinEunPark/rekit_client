@@ -26,6 +26,24 @@ export const VISIBILITY_OPTS: { id: 'public' | 'private'; label: string }[] = [
   { id: 'private', label: '비공개 (임시 저장)' },
 ]
 
+// DB 컬럼이 INTEGER(최대 약 21억)라 넘는 값은 INSERT 에서 500 으로 터진다 — 입력 단계에서 막는다.
+export const MAX_PRICE = 1_000_000_000
+export const MAX_STOCK = 9_999
+export const MAX_YEAR = 9_999
+
+/**
+ * 숫자 입력칸 @input 핸들러용. 숫자만 남기고 max 로 고정한 문자열을 반환한다.
+ * ref 값이 그대로면 Vue 가 다시 그리지 않아 초과 입력이 화면에 남으므로 input 값도 직접 덮어쓴다.
+ */
+export function sanitizeNumInput(e: Event, max: number, withComma = false): string {
+  const el = e.target as HTMLInputElement
+  const digits = el.value.replace(/[^0-9]/g, '')
+  const v = digits ? Math.min(Number(digits), max) : null
+  const out = v === null ? '' : withComma ? v.toLocaleString('ko-KR') : String(v)
+  el.value = out
+  return out
+}
+
 export function parseNum(s: string): number {
   return Number(s.replace(/[^0-9]/g, '')) || 0
 }
