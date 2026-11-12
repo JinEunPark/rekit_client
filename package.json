@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "gen-sitemap": "node scripts/gen-sitemap.mjs",
     "gen-og": "node scripts/gen-og.mjs",
+    "gen-preview": "node scripts/gen-preview.mjs",
     "prerender": "node scripts/prerender.mjs",
     "build-only": "npm run gen-sitemap && vite build && npm run prerender",
     "type-check": "vue-tsc --build",
