@@ -184,6 +184,13 @@
   - ✅ presign 에서 SVG 제거 → `POST /uploads/svg` 서버 경유 업로드 신설. presign 은 브라우저가 스토리지로 직접 PUT 하는 구조라, confirm 을 생략하면 검사가 실행되지 않은 채 공개됐음 (재현 확인). 이제 검사를 통과한 바이트만 저장됨
   - ✅ `is_svg_safe` 우회 보완 — SMIL(`<animate>`/`<set>`/`<animateTransform>`/`<animateMotion>`) 태그 차단, URL 스킴의 공백·제어문자 정규화 후 비교(`java&#10;script:` 차단)
   - [ ] 스토리지가 앱과 동일 오리진(`rekit.co.kr/s3/…`) — 별도 도메인 분리 또는 `Content-Disposition`/CSP 검토 (인프라 작업, 심층방어용)
+- **상품 이미지 용량 최적화 (2026-11-13)** — 카드 썸네일이 폰 원본(4000×3000, 2.5~3.9MB)을 그대로 서빙 중이었음. 상품 6개 목록에 이미지 19.4MB, Fast 4G 기준 전부 뜨는 데 18.2초
+  - ✅ 업로드 전 브라우저 리사이즈·재압축 — `src/utils/compressImage.ts` (긴 변 1600px, WebP q0.82, EXIF 회전 반영·메타데이터 제거, 300KB 이하·1600px 이하면 건너뜀). `uploadImage()` 에 연결. 실측(헤드리스 Chrome): 6장 19.37MB → 0.88MB (-95.5%), 장당 120~320ms
+  - ✅ `ProductTile` 로딩 스켈레톤(shimmer) + 로드 완료 시 fade-in, `decoding="async"`, `prefers-reduced-motion` 대응
+  - [ ] **기존 이미지 재압축** — 백엔드 `scripts/recompress_product_images.py` (dry-run 기본, `--apply` 시 `backup/originals/` 로 백업 후 같은 키 덮어쓰기, DB 무수정). 운영 실행 전 dry-run 결과 확인. 시뮬레이션: 12장 38.7MB → 3.0MB (-92.2%), Fast 4G 목록 로딩 18.2초 → 1.8초
+  - [ ] 엣지 nginx `/s3/` 에 `Cache-Control` 추가 (현재 헤더 없음 → 브라우저 휴리스틱 캐시에 의존). 키가 UUID 라 재압축 이후엔 `public, max-age=31536000, immutable` 가능
+  - [ ] 카드 전용 썸네일(480px, ~20KB) 분리 — DB `thumb_url` 또는 imgproxy 도입 검토. 1600px 도 카드(≈200px)엔 여전히 과함
+  - [ ] 운영 데이터: 상품마다 2번째 이미지가 1번째와 바이트 동일(같은 사진 2회 업로드) — 관리자 업로드 UX 확인
 
 ---
 

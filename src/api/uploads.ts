@@ -1,4 +1,5 @@
 import { apiRequest } from '@/api/client'
+import { compressImage } from '@/utils/compressImage'
 
 export type UploadPurpose = 'product_image' | 'category_image'
 export type UploadContentType = 'image/jpeg' | 'image/png' | 'image/webp'
@@ -78,7 +79,9 @@ export async function uploadImage(file: File, purpose: UploadPurpose = 'product_
     const label = acceptsSvg(purpose) ? 'JPG, PNG, WEBP, SVG' : 'JPG, PNG, WEBP'
     throw new Error(`${label} 파일만 업로드할 수 있습니다.`)
   }
-  const presigned = await presignUpload(file.type as UploadContentType, purpose)
-  await putToStorage(presigned, file)
+  // 폰 원본(수 MB)을 그대로 서빙하지 않도록 업로드 직전에 리사이즈·재압축한다.
+  const { file: upload } = await compressImage(file)
+  const presigned = await presignUpload(upload.type as UploadContentType, purpose)
+  await putToStorage(presigned, upload)
   return confirmUpload(presigned.key)
 }

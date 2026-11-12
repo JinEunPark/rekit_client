@@ -42,12 +42,14 @@ const gradeTone = computed(
   () => (props.grade ? (props.grade.toLowerCase() as 'a' | 'b' | 'c') : undefined),
 )
 
-// 이미지 로드 실패 시 placeholder 로 폴백.
+// 이미지 로드 실패 시 placeholder 로 폴백. 로드 중에는 shimmer 스켈레톤 → 완료 시 fade-in.
 const imageFailed = ref(false)
+const imageLoaded = ref(false)
 watch(
   () => props.imageUrl,
   () => {
     imageFailed.value = false
+    imageLoaded.value = false
   },
 )
 const showImage = computed(() => !!props.imageUrl && !imageFailed.value)
@@ -55,12 +57,16 @@ const showImage = computed(() => !!props.imageUrl && !imageFailed.value)
 
 <template>
   <div class="rekit-tile" :style="tileStyle">
+    <div v-if="showImage && !imageLoaded" class="rekit-tile__skeleton" aria-hidden="true" />
     <img
       v-if="showImage"
       :src="imageUrl"
       :alt="label ?? ''"
       class="rekit-tile__img"
+      :class="{ 'rekit-tile__img--loaded': imageLoaded }"
       loading="lazy"
+      decoding="async"
+      @load="imageLoaded = true"
       @error="imageFailed = true"
     />
     <div v-else class="rekit-tile__glyph">
@@ -90,6 +96,41 @@ const showImage = computed(() => !!props.imageUrl && !imageFailed.value)
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.rekit-tile__img--loaded {
+  opacity: 1;
+}
+/* 로딩 중 shimmer — 톤 그라데이션 위에 밝은 띠가 지나간다. */
+.rekit-tile__skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  background-size: 200% 100%;
+  animation: rekit-tile-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes rekit-tile-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rekit-tile__skeleton {
+    animation: none;
+    background: rgba(255, 255, 255, 0.35);
+  }
+  .rekit-tile__img {
+    transition: none;
+  }
 }
 .rekit-tile__glyph {
   width: 62%;
